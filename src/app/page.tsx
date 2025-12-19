@@ -6,20 +6,18 @@ export default function PatientComfort() {
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Connecting...');
-  const [lastResponse, setLastResponse] = useState('');
+  const [isPlaying, setIsPlaying] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // Circadian color system
   const getCircadianColors = () => {
     const now = new Date();
     const hours = now.getHours();
     const minutes = now.getMinutes();
     const totalMinutes = hours * 60 + minutes;
 
-    // Color palettes
     const palettes = {
       night: { bg1: '#2C1810', bg2: '#1A0F0A', text: '#E8DDD4' },
       sunrise: { bg1: '#FFF5E6', bg2: '#FFE4CC', text: '#4A3D32' },
@@ -42,7 +40,6 @@ export default function PatientComfort() {
     return () => clearInterval(interval);
   }, []);
 
-  // WebSocket connection
   useEffect(() => {
     const ws = new WebSocket('wss://everloved-backend-production.up.railway.app');
     wsRef.current = ws;
@@ -55,6 +52,7 @@ export default function PatientComfort() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      console.log('Received:', data.type);
       
       switch (data.type) {
         case 'session_started':
@@ -64,13 +62,14 @@ export default function PatientComfort() {
           setStatusMessage(`You said: "${data.text}"`);
           break;
         case 'response_text':
-          setLastResponse(data.text);
           setStatusMessage(data.text);
           break;
         case 'response_audio':
+          console.log('Audio received, playing...');
           playAudio(data.audio);
           break;
         case 'error':
+          console.error('Server error:', data.message);
           setStatusMessage('Something went wrong. Tap to try again.');
           break;
       }
@@ -82,7 +81,8 @@ export default function PatientComfort() {
       setTimeout(() => window.location.reload(), 3000);
     };
 
-    ws.onerror = () => {
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
       setStatusMessage('Connection error. Please refresh.');
     };
 
@@ -91,13 +91,30 @@ export default function PatientComfort() {
     };
   }, []);
 
-  const playAudio = (base64Audio: string) => {
-    const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
-    audio.play();
+  const playAudio = async (base64Audio: string) => {
+    try {
+      setIsPlaying(true);
+      const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
+      
+      audio.onended = () => {
+        setIsPlaying(false);
+        setStatusMessage('Tap anywhere to talk.');
+      };
+      
+      audio.onerror = (e) => {
+        console.error('Audio playback error:', e);
+        setIsPlaying(false);
+      };
+
+      await audio.play();
+    } catch (error) {
+      console.error('Failed to play audio:', error);
+      setIsPlaying(false);
+    }
   };
 
   const startListening = async () => {
-    if (!isConnected || isListening) return;
+    if (!isConnected || isListening || isPlaying) return;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -117,6 +134,7 @@ export default function PatientComfort() {
         reader.onloadend = () => {
           const base64 = (reader.result as string).split(',')[1];
           wsRef.current?.send(JSON.stringify({ type: 'audio_data', audio: base64 }));
+          setStatusMessage('Processing...');
         };
         reader.readAsDataURL(audioBlob);
         stream.getTracks().forEach(track => track.stop());
@@ -126,12 +144,10 @@ export default function PatientComfort() {
       setIsListening(true);
       setStatusMessage('Listening...');
 
-      // Auto-stop after 5 seconds
       setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
           setIsListening(false);
-          setStatusMessage('Processing...');
         }
       }, 5000);
 
@@ -165,7 +181,6 @@ export default function PatientComfort() {
         userSelect: 'none',
       }}
     >
-      {/* Puppy */}
       <div style={{ marginBottom: '40px' }}>
         <img
           src="/puppy.png"
@@ -174,24 +189,22 @@ export default function PatientComfort() {
             width: '200px',
             height: '200px',
             objectFit: 'contain',
-            animation: isListening ? 'pulse 1s infinite' : 'breathe 4s ease-in-out infinite',
+            animation: isListening ? 'pulse 1s infinite' : isPlaying ? 'bounce 0.5s infinite' : 'breathe 4s ease-in-out infinite',
           }}
         />
       </div>
 
-      {/* Status indicator */}
       <div
         style={{
           width: '20px',
           height: '20px',
           borderRadius: '50%',
-          background: isConnected ? (isListening ? '#E74C3C' : '#7A9B6D') : '#999',
+          background: isConnected ? (isListening ? '#E74C3C' : isPlaying ? '#3498DB' : '#7A9B6D') : '#999',
           marginBottom: '20px',
           animation: isListening ? 'pulse 1s infinite' : 'none',
         }}
       />
 
-      {/* Message */}
       <p
         style={{
           color: colors.text,
@@ -205,10 +218,15 @@ export default function PatientComfort() {
         {statusMessage}
       </p>
 
-      {/* Listening indicator */}
       {isListening && (
         <p style={{ color: colors.text, opacity: 0.7, marginTop: '20px' }}>
           Tap again to stop listening
+        </p>
+      )}
+
+      {isPlaying && (
+        <p style={{ color: colors.text, opacity: 0.7, marginTop: '20px' }}>
+          🔊 Speaking...
         </p>
       )}
 
@@ -220,6 +238,10 @@ export default function PatientComfort() {
         @keyframes pulse {
           0%, 100% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
         }
       `}</style>
     </div>
