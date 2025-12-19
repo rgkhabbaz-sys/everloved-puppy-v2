@@ -214,7 +214,7 @@ export default function PatientComfort() {
           backdropFilter: 'blur(10px)',
         }}
       >
-        ← Dashboard
+        Monitoring Dashboard
       </Link>
 
       <div
