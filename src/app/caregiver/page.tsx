@@ -345,9 +345,9 @@ export default function AvatarConfiguration() {
       <HelpText>Start by telling us about the person you&apos;re caring for. This helps the AI companion understand who they&apos;re supporting.</HelpText>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
         <div>
-          <Input label="Patient's Name" value={patientName} onChange={setPatientName} placeholder="e.g., Vera" />
-          <Input label="Your Name (Caregiver)" value={caregiverName} onChange={setCaregiverName} placeholder="e.g., Michael" />
-          <Input label="Your Relationship" value={relationship} onChange={setRelationship} placeholder="e.g., Son, Daughter, Spouse" />
+          <div style={{ marginBottom: "16px" }}><label style={{ display: "block", marginBottom: "8px", fontSize: "0.9rem", fontWeight: 600, color: colors.text }}>Patient's Name</label><input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="e.g., Vera" style={{ width: "100%", padding: "14px 18px", borderRadius: "12px", border: `1.5px solid ${colors.inputBorder}`, fontSize: "1rem", background: colors.inputBg }} /></div>
+          <div style={{ marginBottom: "16px" }}><label style={{ display: "block", marginBottom: "8px", fontSize: "0.9rem", fontWeight: 600, color: colors.text }}>Your Name (Caregiver)</label><input type="text" value={caregiverName} onChange={(e) => setCaregiverName(e.target.value)} placeholder="e.g., Michael" style={{ width: "100%", padding: "14px 18px", borderRadius: "12px", border: `1.5px solid ${colors.inputBorder}`, fontSize: "1rem", background: colors.inputBg }} /></div>
+          <div style={{ marginBottom: "16px" }}><label style={{ display: "block", marginBottom: "8px", fontSize: "0.9rem", fontWeight: 600, color: colors.text }}>Your Relationship</label><input type="text" value={relationship} onChange={(e) => setRelationship(e.target.value)} placeholder="e.g., Son, Daughter, Spouse" style={{ width: "100%", padding: "14px 18px", borderRadius: "12px", border: `1.5px solid ${colors.inputBorder}`, fontSize: "1rem", background: colors.inputBg }} /></div>
         </div>
         <div>
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: 600, color: colors.text }}>Patient Photo</label>
