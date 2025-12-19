@@ -6,7 +6,7 @@ import Link from 'next/link';
 export default function PatientComfort() {
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('Connecting...');
+  const [statusMessage, setStatusMessage] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [mounted, setMounted] = useState(false);
   
@@ -14,8 +14,6 @@ export default function PatientComfort() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const hasAutoStarted = useRef(false);
-  const audioQueueRef = useRef<string[]>([]);
-  const isPlayingRef = useRef(false);
 
   const getCircadianColors = () => {
     const now = new Date();
@@ -46,9 +44,7 @@ export default function PatientComfort() {
   useEffect(() => {
     setMounted(true);
     setCircadianColors(getCircadianColors());
-    const interval = setInterval(() => {
-      setCircadianColors(getCircadianColors());
-    }, 60000);
+    const interval = setInterval(() => setCircadianColors(getCircadianColors()), 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -57,52 +53,28 @@ export default function PatientComfort() {
     return localStorage.getItem('everloved-session-active') === 'true';
   };
 
-  // Play audio queue sequentially
-  const playNextAudio = async () => {
-    if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
-    
-    isPlayingRef.current = true;
-    setIsPlaying(true);
-    
-    const audioBase64 = audioQueueRef.current.shift();
-    if (!audioBase64) {
-      isPlayingRef.current = false;
-      setIsPlaying(false);
-      return;
-    }
-
-    try {
-      const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
-      
+  const playAudio = (base64Audio: string) => {
+    return new Promise<void>((resolve) => {
+      setIsPlaying(true);
+      const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
       audio.onended = () => {
-        isPlayingRef.current = false;
-        if (audioQueueRef.current.length > 0) {
-          playNextAudio();
-        } else {
-          setIsPlaying(false);
-          // Auto-restart listening after response
-          if (isSessionActive()) {
-            setTimeout(() => startListening(), 500);
-          }
-        }
+        setIsPlaying(false);
+        resolve();
       };
-      
       audio.onerror = () => {
-        isPlayingRef.current = false;
-        playNextAudio();
+        setIsPlaying(false);
+        resolve();
       };
-
-      await audio.play();
-    } catch (error) {
-      console.error('Audio play error:', error);
-      isPlayingRef.current = false;
-      playNextAudio();
-    }
+      audio.play().catch(() => {
+        setIsPlaying(false);
+        resolve();
+      });
+    });
   };
 
   const startListening = async () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    if (isListening || isPlayingRef.current) return;
+    if (isListening || isPlaying) return;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -111,19 +83,15 @@ export default function PatientComfort() {
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
       };
 
-      mediaRecorder.onstop = async () => {
+      mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64 = (reader.result as string).split(',')[1];
-          if (wsRef.current?.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify({ type: 'audio_data', audio: base64 }));
-          }
+          wsRef.current?.send(JSON.stringify({ type: 'audio_data', audio: base64 }));
           setStatusMessage('...');
         };
         reader.readAsDataURL(audioBlob);
@@ -134,7 +102,6 @@ export default function PatientComfort() {
       setIsListening(true);
       setStatusMessage('I\'m listening...');
 
-      // Shorter recording time for faster response
       setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
@@ -156,48 +123,45 @@ export default function PatientComfort() {
 
     ws.onopen = () => {
       setIsConnected(true);
-      setStatusMessage('Hello! I\'m here with you.');
+      // Don't show message until session actually starts
       const patientName = localStorage.getItem('everloved-patient-name') || '';
       const caregiverName = localStorage.getItem('everloved-caregiver-name') || '';
       ws.send(JSON.stringify({ type: 'start_session', patientName, caregiverName }));
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
       const data = JSON.parse(event.data);
       
       if (data.type === 'session_started') {
+        // Auto-start if coming from dashboard
         if (isSessionActive() && !hasAutoStarted.current) {
           hasAutoStarted.current = true;
-          setTimeout(() => startListening(), 1000);
+          setTimeout(() => startListening(), 500);
         }
       } else if (data.type === 'transcription') {
         setStatusMessage('You said: "' + data.text + '"');
       } else if (data.type === 'response_chunk') {
-        // Update text as it streams in
         setStatusMessage(prev => {
           if (prev.startsWith('You said:') || prev === '...') return data.text;
           return prev + data.text;
         });
-      } else if (data.type === 'audio_chunk') {
-        // Queue audio and start playing
-        audioQueueRef.current.push(data.audio);
-        if (data.isFirst) {
-          playNextAudio();
+      } else if (data.type === 'response_text') {
+        setStatusMessage(data.text);
+      } else if (data.type === 'response_audio') {
+        await playAudio(data.audio);
+        // After audio finishes, restart listening if session active
+        if (isSessionActive()) {
+          setTimeout(() => startListening(), 800);
         }
       } else if (data.type === 'response_end') {
-        // Response complete
-        if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
-          if (isSessionActive()) {
-            setTimeout(() => startListening(), 500);
-          }
+        // If no audio was sent, restart listening
+        if (!isPlaying && isSessionActive()) {
+          setTimeout(() => startListening(), 800);
         }
-      } else if (data.type === 'response_text') {
-        // Fallback for non-streaming response
-        setStatusMessage(data.text);
       } else if (data.type === 'error') {
         setStatusMessage('Let me try again...');
         if (isSessionActive()) {
-          setTimeout(() => startListening(), 2000);
+          setTimeout(() => startListening(), 1500);
         }
       }
     };
@@ -221,7 +185,7 @@ export default function PatientComfort() {
   const handleScreenTap = () => {
     if (!isSessionActive()) {
       if (isListening) stopListening();
-      else if (!isPlayingRef.current) startListening();
+      else if (!isPlaying) startListening();
     }
   };
 
@@ -230,19 +194,11 @@ export default function PatientComfort() {
       <Link 
         href="/caregiver/monitoring" 
         style={{ 
-          position: 'absolute',
-          top: '16px',
-          right: '16px',
-          zIndex: 10,
-          padding: '10px 20px', 
-          borderRadius: '20px', 
-          background: uiColors.cardBg, 
-          color: uiColors.textMuted, 
-          fontWeight: 500, 
-          fontSize: '0.85rem', 
-          textDecoration: 'none', 
-          border: '1px solid ' + uiColors.cardBorder,
-          backdropFilter: 'blur(10px)',
+          position: 'absolute', top: '16px', right: '16px', zIndex: 10,
+          padding: '10px 20px', borderRadius: '20px', 
+          background: uiColors.cardBg, color: uiColors.textMuted, 
+          fontWeight: 500, fontSize: '0.85rem', textDecoration: 'none', 
+          border: '1px solid ' + uiColors.cardBorder, backdropFilter: 'blur(10px)',
         }}
       >
         Monitoring Dashboard
@@ -253,47 +209,28 @@ export default function PatientComfort() {
         style={{
           flex: 1,
           background: 'linear-gradient(135deg, ' + circadianColors.bg1 + ' 0%, ' + circadianColors.bg2 + ' 100%)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '40px',
-          cursor: 'pointer',
-          transition: 'background 2s ease',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          padding: '40px', cursor: 'pointer', transition: 'background 2s ease',
         }}
       >
         <div style={{ marginBottom: '40px' }}>
-          <img
-            src="/puppy.png"
-            alt="Comfort companion"
-            style={{
-              width: '200px',
-              height: '200px',
-              objectFit: 'contain',
-            }}
-          />
+          <img src="/puppy.png" alt="Comfort companion" style={{ width: '200px', height: '200px', objectFit: 'contain' }} />
         </div>
 
-        <div
-          style={{
-            width: '20px',
-            height: '20px',
-            borderRadius: '50%',
-            background: isConnected ? (isListening ? '#E74C3C' : isPlaying ? '#3498DB' : '#7A9B6D') : '#999',
-            marginBottom: '20px',
-          }}
-        />
+        <div style={{
+          width: '20px', height: '20px', borderRadius: '50%',
+          background: isConnected ? (isListening ? '#E74C3C' : isPlaying ? '#3498DB' : '#7A9B6D') : '#999',
+          marginBottom: '20px',
+        }} />
 
-        <p style={{
-          color: circadianColors.text,
-          fontSize: '1.8rem',
-          textAlign: 'center',
-          maxWidth: '600px',
-          lineHeight: 1.6,
-          fontWeight: 300,
-        }}>
-          {statusMessage}
-        </p>
+        {statusMessage && (
+          <p style={{
+            color: circadianColors.text, fontSize: '1.8rem', textAlign: 'center',
+            maxWidth: '600px', lineHeight: 1.6, fontWeight: 300,
+          }}>
+            {statusMessage}
+          </p>
+        )}
 
         {isListening && (
           <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
@@ -307,7 +244,7 @@ export default function PatientComfort() {
           </p>
         )}
 
-        {!isSessionActive() && !isListening && !isPlaying && isConnected && (
+        {!isSessionActive() && !isListening && !isPlaying && isConnected && !statusMessage && (
           <p style={{ color: circadianColors.text, opacity: 0.5, marginTop: '30px', fontSize: '1rem' }}>
             Tap anywhere to talk
           </p>
