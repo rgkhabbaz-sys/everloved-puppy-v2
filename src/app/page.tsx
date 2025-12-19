@@ -191,44 +191,31 @@ export default function PatientComfort() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Header matching caregiver layout style */}
-      <header style={{ 
-        position: 'sticky', 
-        top: 0, 
-        zIndex: 100, 
-        padding: '8px 40px', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between', 
-        borderBottom: '1px solid ' + colors.cardBorder, 
-        background: 'rgba(255,255,255,0.85)', 
-        backdropFilter: 'blur(10px)' 
-      }}>
-        <Link href="/">
-          <img src="/logo-horizontal.png" alt="everloved" style={{ height: '100px', width: 'auto' }} />
-        </Link>
-        <nav style={{ display: 'flex', gap: '8px' }}>
-          <Link 
-            href="/caregiver/monitoring" 
-            style={{ 
-              padding: '10px 20px', 
-              borderRadius: '20px', 
-              background: colors.cardBg, 
-              color: colors.text, 
-              fontWeight: 600, 
-              fontSize: '0.9rem', 
-              textDecoration: 'none', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              border: '1px solid ' + colors.cardBorder 
-            }}
-          >
-            <span style={{ opacity: 0.7 }}>⚙</span>Caregiver Control
-          </Link>
-        </nav>
-      </header>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {/* Single minimal button - top right corner */}
+      <Link 
+        href="/caregiver/monitoring" 
+        style={{ 
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          zIndex: 10,
+          padding: '10px 20px', 
+          borderRadius: '20px', 
+          background: colors.cardBg, 
+          color: colors.textMuted, 
+          fontWeight: 500, 
+          fontSize: '0.85rem', 
+          textDecoration: 'none', 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '6px', 
+          border: '1px solid ' + colors.cardBorder,
+          backdropFilter: 'blur(10px)',
+        }}
+      >
+        ← Dashboard
+      </Link>
 
       <div
         onClick={handleScreenTap}
