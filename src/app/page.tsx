@@ -14,27 +14,24 @@ export default function PatientComfort() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const hasAutoStarted = useRef(false);
+  const audioQueueRef = useRef<string[]>([]);
+  const isPlayingRef = useRef(false);
 
-  // Circadian color system based on time of day
   const getCircadianColors = () => {
     const now = new Date();
     const hours = now.getHours();
     const minutes = now.getMinutes();
     const totalMinutes = hours * 60 + minutes;
 
-    // 5:00 AM - 7:00 AM: Sunrise (warm peach)
     if (totalMinutes >= 300 && totalMinutes < 420) {
       return { bg1: '#FFF5E6', bg2: '#FFE4CC', text: '#4A3D32' };
     }
-    // 7:00 AM - 5:00 PM: Day (soft blue)
     if (totalMinutes >= 420 && totalMinutes < 1020) {
       return { bg1: '#F0F7FF', bg2: '#E1EFFE', text: '#2C3E50' };
     }
-    // 5:00 PM - 9:00 PM: Evening (warm amber)
     if (totalMinutes >= 1020 && totalMinutes < 1260) {
       return { bg1: '#3D2914', bg2: '#2C1810', text: '#E8DDD4' };
     }
-    // 9:00 PM - 5:00 AM: Night (deep warm brown)
     return { bg1: '#2C1810', bg2: '#1A0F0A', text: '#E8DDD4' };
   };
 
@@ -60,15 +57,52 @@ export default function PatientComfort() {
     return localStorage.getItem('everloved-session-active') === 'true';
   };
 
+  // Play audio queue sequentially
+  const playNextAudio = async () => {
+    if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
+    
+    isPlayingRef.current = true;
+    setIsPlaying(true);
+    
+    const audioBase64 = audioQueueRef.current.shift();
+    if (!audioBase64) {
+      isPlayingRef.current = false;
+      setIsPlaying(false);
+      return;
+    }
+
+    try {
+      const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+      
+      audio.onended = () => {
+        isPlayingRef.current = false;
+        if (audioQueueRef.current.length > 0) {
+          playNextAudio();
+        } else {
+          setIsPlaying(false);
+          // Auto-restart listening after response
+          if (isSessionActive()) {
+            setTimeout(() => startListening(), 500);
+          }
+        }
+      };
+      
+      audio.onerror = () => {
+        isPlayingRef.current = false;
+        playNextAudio();
+      };
+
+      await audio.play();
+    } catch (error) {
+      console.error('Audio play error:', error);
+      isPlayingRef.current = false;
+      playNextAudio();
+    }
+  };
+
   const startListening = async () => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.log('WebSocket not ready');
-      return;
-    }
-    if (isListening || isPlaying) {
-      console.log('Already listening or playing');
-      return;
-    }
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    if (isListening || isPlayingRef.current) return;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -90,7 +124,7 @@ export default function PatientComfort() {
           if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({ type: 'audio_data', audio: base64 }));
           }
-          setStatusMessage('Let me think...');
+          setStatusMessage('...');
         };
         reader.readAsDataURL(audioBlob);
         stream.getTracks().forEach(track => track.stop());
@@ -99,64 +133,28 @@ export default function PatientComfort() {
       mediaRecorder.start();
       setIsListening(true);
       setStatusMessage('I\'m listening...');
-      console.log('Started listening');
 
+      // Shorter recording time for faster response
       setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
           setIsListening(false);
         }
-      }, 6000);
+      }, 4000);
 
     } catch (error) {
       console.error('Microphone error:', error);
       setStatusMessage('Please allow microphone access.');
-      if (isSessionActive()) {
-        setTimeout(() => startListening(), 3000);
-      }
-    }
-  };
-
-  const playAudio = async (base64Audio: string) => {
-    try {
-      setIsPlaying(true);
-      const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
-      
-      audio.onended = () => {
-        setIsPlaying(false);
-        if (isSessionActive()) {
-          setTimeout(() => startListening(), 1500);
-        } else {
-          setStatusMessage('Tap anywhere to talk.');
-        }
-      };
-      
-      audio.onerror = () => {
-        setIsPlaying(false);
-        if (isSessionActive()) {
-          setTimeout(() => startListening(), 1500);
-        }
-      };
-
-      await audio.play();
-    } catch (error) {
-      console.error('Failed to play audio:', error);
-      setIsPlaying(false);
-      if (isSessionActive()) {
-        setTimeout(() => startListening(), 1500);
-      }
     }
   };
 
   useEffect(() => {
     if (!mounted) return;
     
-    console.log('Connecting to WebSocket...');
     const ws = new WebSocket('wss://everloved-backend-production.up.railway.app');
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('WebSocket connected');
       setIsConnected(true);
       setStatusMessage('Hello! I\'m here with you.');
       const patientName = localStorage.getItem('everloved-patient-name') || '';
@@ -166,7 +164,6 @@ export default function PatientComfort() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      console.log('Received:', data.type);
       
       if (data.type === 'session_started') {
         if (isSessionActive() && !hasAutoStarted.current) {
@@ -175,12 +172,30 @@ export default function PatientComfort() {
         }
       } else if (data.type === 'transcription') {
         setStatusMessage('You said: "' + data.text + '"');
+      } else if (data.type === 'response_chunk') {
+        // Update text as it streams in
+        setStatusMessage(prev => {
+          if (prev.startsWith('You said:') || prev === '...') return data.text;
+          return prev + data.text;
+        });
+      } else if (data.type === 'audio_chunk') {
+        // Queue audio and start playing
+        audioQueueRef.current.push(data.audio);
+        if (data.isFirst) {
+          playNextAudio();
+        }
+      } else if (data.type === 'response_end') {
+        // Response complete
+        if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
+          if (isSessionActive()) {
+            setTimeout(() => startListening(), 500);
+          }
+        }
       } else if (data.type === 'response_text') {
+        // Fallback for non-streaming response
         setStatusMessage(data.text);
-      } else if (data.type === 'response_audio') {
-        playAudio(data.audio);
       } else if (data.type === 'error') {
-        setStatusMessage('Let me try that again...');
+        setStatusMessage('Let me try again...');
         if (isSessionActive()) {
           setTimeout(() => startListening(), 2000);
         }
@@ -193,17 +208,11 @@ export default function PatientComfort() {
       setTimeout(() => window.location.reload(), 3000);
     };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    return () => {
-      ws.close();
-    };
+    return () => ws.close();
   }, [mounted]);
 
   const stopListening = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+    if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop();
       setIsListening(false);
     }
@@ -211,17 +220,13 @@ export default function PatientComfort() {
 
   const handleScreenTap = () => {
     if (!isSessionActive()) {
-      if (isListening) {
-        stopListening();
-      } else if (!isPlaying) {
-        startListening();
-      }
+      if (isListening) stopListening();
+      else if (!isPlayingRef.current) startListening();
     }
   };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      {/* Single minimal button - top right corner */}
       <Link 
         href="/caregiver/monitoring" 
         style={{ 
@@ -236,9 +241,6 @@ export default function PatientComfort() {
           fontWeight: 500, 
           fontSize: '0.85rem', 
           textDecoration: 'none', 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '6px', 
           border: '1px solid ' + uiColors.cardBorder,
           backdropFilter: 'blur(10px)',
         }}
