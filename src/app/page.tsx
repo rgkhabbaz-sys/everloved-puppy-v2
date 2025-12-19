@@ -15,10 +15,32 @@ export default function PatientComfort() {
   const audioChunksRef = useRef<Blob[]>([]);
   const hasAutoStarted = useRef(false);
 
-  const colors = {
-    bg1: '#F0F7FF',
-    bg2: '#E1EFFE', 
-    text: '#2C3E50',
+  // Circadian color system based on time of day
+  const getCircadianColors = () => {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const totalMinutes = hours * 60 + minutes;
+
+    // 5:00 AM - 7:00 AM: Sunrise (warm peach)
+    if (totalMinutes >= 300 && totalMinutes < 420) {
+      return { bg1: '#FFF5E6', bg2: '#FFE4CC', text: '#4A3D32' };
+    }
+    // 7:00 AM - 5:00 PM: Day (soft blue)
+    if (totalMinutes >= 420 && totalMinutes < 1020) {
+      return { bg1: '#F0F7FF', bg2: '#E1EFFE', text: '#2C3E50' };
+    }
+    // 5:00 PM - 9:00 PM: Evening (warm amber)
+    if (totalMinutes >= 1020 && totalMinutes < 1260) {
+      return { bg1: '#3D2914', bg2: '#2C1810', text: '#E8DDD4' };
+    }
+    // 9:00 PM - 5:00 AM: Night (deep warm brown)
+    return { bg1: '#2C1810', bg2: '#1A0F0A', text: '#E8DDD4' };
+  };
+
+  const [circadianColors, setCircadianColors] = useState({ bg1: '#F0F7FF', bg2: '#E1EFFE', text: '#2C3E50' });
+
+  const uiColors = {
     cardBg: 'rgba(255, 255, 255, 0.92)',
     cardBorder: 'rgba(232, 201, 160, 0.4)',
     textMuted: '#8B7355',
@@ -26,6 +48,11 @@ export default function PatientComfort() {
 
   useEffect(() => {
     setMounted(true);
+    setCircadianColors(getCircadianColors());
+    const interval = setInterval(() => {
+      setCircadianColors(getCircadianColors());
+    }, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const isSessionActive = () => {
@@ -202,15 +229,15 @@ export default function PatientComfort() {
           zIndex: 10,
           padding: '10px 20px', 
           borderRadius: '20px', 
-          background: colors.cardBg, 
-          color: colors.textMuted, 
+          background: uiColors.cardBg, 
+          color: uiColors.textMuted, 
           fontWeight: 500, 
           fontSize: '0.85rem', 
           textDecoration: 'none', 
           display: 'flex', 
           alignItems: 'center', 
           gap: '6px', 
-          border: '1px solid ' + colors.cardBorder,
+          border: '1px solid ' + uiColors.cardBorder,
           backdropFilter: 'blur(10px)',
         }}
       >
@@ -221,13 +248,14 @@ export default function PatientComfort() {
         onClick={handleScreenTap}
         style={{
           flex: 1,
-          background: 'linear-gradient(135deg, ' + colors.bg1 + ' 0%, ' + colors.bg2 + ' 100%)',
+          background: 'linear-gradient(135deg, ' + circadianColors.bg1 + ' 0%, ' + circadianColors.bg2 + ' 100%)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           padding: '40px',
           cursor: 'pointer',
+          transition: 'background 2s ease',
         }}
       >
         <div style={{ marginBottom: '40px' }}>
@@ -253,7 +281,7 @@ export default function PatientComfort() {
         />
 
         <p style={{
-          color: colors.text,
+          color: circadianColors.text,
           fontSize: '1.8rem',
           textAlign: 'center',
           maxWidth: '600px',
@@ -264,19 +292,19 @@ export default function PatientComfort() {
         </p>
 
         {isListening && (
-          <p style={{ color: colors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
+          <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
             🎙️ Listening...
           </p>
         )}
 
         {isPlaying && (
-          <p style={{ color: colors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
+          <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
             🔊 Speaking...
           </p>
         )}
 
         {!isSessionActive() && !isListening && !isPlaying && isConnected && (
-          <p style={{ color: colors.text, opacity: 0.5, marginTop: '30px', fontSize: '1rem' }}>
+          <p style={{ color: circadianColors.text, opacity: 0.5, marginTop: '30px', fontSize: '1rem' }}>
             Tap anywhere to talk
           </p>
         )}
