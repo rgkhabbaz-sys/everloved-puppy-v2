@@ -552,8 +552,8 @@ export default function AvatarConfiguration() {
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 1: return <Step1Content />; case 2: return <Step2Content />;
-      case 3: return <Step3Content />; case 4: return <Step4Content />; default: return null;
+      case 1: return Step1Content(); case 2: return Step2Content();
+      case 3: return Step3Content(); case 4: return Step4Content(); default: return null;
     }
   };
 
