@@ -18,10 +18,12 @@ export default function PatientComfort() {
   const colors = {
     bg1: '#F0F7FF',
     bg2: '#E1EFFE', 
-    text: '#2C3E50'
+    text: '#2C3E50',
+    cardBg: 'rgba(255, 255, 255, 0.92)',
+    cardBorder: 'rgba(232, 201, 160, 0.4)',
+    textMuted: '#8B7355',
   };
 
-  // Mark as mounted
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -119,7 +121,6 @@ export default function PatientComfort() {
     }
   };
 
-  // WebSocket connection
   useEffect(() => {
     if (!mounted) return;
     
@@ -189,32 +190,45 @@ export default function PatientComfort() {
     }
   };
 
-  // Always render content
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <nav style={{
-        background: 'rgba(255,255,255,0.95)',
-        padding: '12px 24px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderBottom: '1px solid #eee',
+      {/* Header matching caregiver layout style */}
+      <header style={{ 
+        position: 'sticky', 
+        top: 0, 
+        zIndex: 100, 
+        padding: '8px 40px', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        borderBottom: '1px solid ' + colors.cardBorder, 
+        background: 'rgba(255,255,255,0.85)', 
+        backdropFilter: 'blur(10px)' 
       }}>
-        <Link href="/" style={{ textDecoration: 'none' }}>
-          <img src="/logo.png" alt="Everloved" style={{ height: '32px' }} />
+        <Link href="/">
+          <img src="/logo-horizontal.png" alt="everloved" style={{ height: '100px', width: 'auto' }} />
         </Link>
-        <div style={{ display: 'flex', gap: '24px' }}>
-          <Link href="/caregiver" style={{ color: '#4A3D32', textDecoration: 'none', fontSize: '0.95rem' }}>
-            Avatar Setup
+        <nav style={{ display: 'flex', gap: '8px' }}>
+          <Link 
+            href="/caregiver/monitoring" 
+            style={{ 
+              padding: '10px 20px', 
+              borderRadius: '20px', 
+              background: colors.cardBg, 
+              color: colors.text, 
+              fontWeight: 600, 
+              fontSize: '0.9rem', 
+              textDecoration: 'none', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              border: '1px solid ' + colors.cardBorder 
+            }}
+          >
+            <span style={{ opacity: 0.7 }}>⚙</span>Caregiver Control
           </Link>
-          <Link href="/caregiver/monitoring" style={{ color: '#4A3D32', textDecoration: 'none', fontSize: '0.95rem' }}>
-            Dashboard
-          </Link>
-          <Link href="/science" style={{ color: '#4A3D32', textDecoration: 'none', fontSize: '0.95rem' }}>
-            Science
-          </Link>
-        </div>
-      </nav>
+        </nav>
+      </header>
 
       <div
         onClick={handleScreenTap}
