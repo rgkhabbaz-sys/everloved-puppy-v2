@@ -8,41 +8,26 @@ export default function PatientComfort() {
   const [isListening, setIsListening] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Connecting...');
   const [isPlaying, setIsPlaying] = useState(false);
+  const [mounted, setMounted] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const hasAutoStarted = useRef(false);
 
-  const getCircadianColors = () => {
-    const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const totalMinutes = hours * 60 + minutes;
-
-    const palettes = {
-      night: { bg1: '#2C1810', bg2: '#1A0F0A', text: '#E8DDD4' },
-      sunrise: { bg1: '#FFF5E6', bg2: '#FFE4CC', text: '#4A3D32' },
-      day: { bg1: '#F0F7FF', bg2: '#E1EFFE', text: '#2C3E50' },
-      evening: { bg1: '#3D2914', bg2: '#2C1810', text: '#E8DDD4' },
-    };
-
-    if (totalMinutes >= 300 && totalMinutes < 420) return palettes.sunrise;
-    if (totalMinutes >= 420 && totalMinutes < 1020) return palettes.day;
-    if (totalMinutes >= 1020 && totalMinutes < 1260) return palettes.evening;
-    return palettes.night;
+  const colors = {
+    bg1: '#F0F7FF',
+    bg2: '#E1EFFE', 
+    text: '#2C3E50'
   };
 
-  const [colors, setColors] = useState(getCircadianColors());
-
+  // Mark as mounted
   useEffect(() => {
-    const interval = setInterval(() => {
-      setColors(getCircadianColors());
-    }, 60000);
-    return () => clearInterval(interval);
+    setMounted(true);
   }, []);
 
   const isSessionActive = () => {
+    if (typeof window === 'undefined') return false;
     return localStorage.getItem('everloved-session-active') === 'true';
   };
 
@@ -87,19 +72,16 @@ export default function PatientComfort() {
       setStatusMessage('I\'m listening...');
       console.log('Started listening');
 
-      // Auto-stop after 6 seconds
       setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
           setIsListening(false);
-          console.log('Stopped listening (timeout)');
         }
       }, 6000);
 
     } catch (error) {
       console.error('Microphone error:', error);
       setStatusMessage('Please allow microphone access.');
-      // Retry if session active
       if (isSessionActive()) {
         setTimeout(() => startListening(), 3000);
       }
@@ -113,18 +95,14 @@ export default function PatientComfort() {
       
       audio.onended = () => {
         setIsPlaying(false);
-        console.log('Audio ended');
-        // Auto-restart listening if session still active
         if (isSessionActive()) {
-          console.log('Session active, restarting listening');
           setTimeout(() => startListening(), 1500);
         } else {
           setStatusMessage('Tap anywhere to talk.');
         }
       };
       
-      audio.onerror = (e) => {
-        console.error('Audio playback error:', e);
+      audio.onerror = () => {
         setIsPlaying(false);
         if (isSessionActive()) {
           setTimeout(() => startListening(), 1500);
@@ -143,6 +121,8 @@ export default function PatientComfort() {
 
   // WebSocket connection
   useEffect(() => {
+    if (!mounted) return;
+    
     console.log('Connecting to WebSocket...');
     const ws = new WebSocket('wss://everloved-backend-production.up.railway.app');
     wsRef.current = ws;
@@ -158,41 +138,26 @@ export default function PatientComfort() {
       const data = JSON.parse(event.data);
       console.log('Received:', data.type);
       
-      switch (data.type) {
-        case 'session_started':
-          console.log('Session started, checking auto-start...');
-          // Auto-start if session is active and we haven't auto-started yet
-          if (isSessionActive() && !hasAutoStarted.current) {
-            hasAutoStarted.current = true;
-            console.log('Auto-starting listening in 1 second...');
-            setTimeout(() => {
-              console.log('Calling startListening...');
-              startListening();
-            }, 1000);
-          }
-          break;
-        case 'transcription':
-          setStatusMessage(`You said: "${data.text}"`);
-          break;
-        case 'response_text':
-          setStatusMessage(data.text);
-          break;
-        case 'response_audio':
-          console.log('Audio received');
-          playAudio(data.audio);
-          break;
-        case 'error':
-          console.error('Server error:', data.message);
-          setStatusMessage('Let me try that again...');
-          if (isSessionActive()) {
-            setTimeout(() => startListening(), 2000);
-          }
-          break;
+      if (data.type === 'session_started') {
+        if (isSessionActive() && !hasAutoStarted.current) {
+          hasAutoStarted.current = true;
+          setTimeout(() => startListening(), 1000);
+        }
+      } else if (data.type === 'transcription') {
+        setStatusMessage('You said: "' + data.text + '"');
+      } else if (data.type === 'response_text') {
+        setStatusMessage(data.text);
+      } else if (data.type === 'response_audio') {
+        playAudio(data.audio);
+      } else if (data.type === 'error') {
+        setStatusMessage('Let me try that again...');
+        if (isSessionActive()) {
+          setTimeout(() => startListening(), 2000);
+        }
       }
     };
 
     ws.onclose = () => {
-      console.log('WebSocket closed');
       setIsConnected(false);
       setStatusMessage('Reconnecting...');
       setTimeout(() => window.location.reload(), 3000);
@@ -205,7 +170,7 @@ export default function PatientComfort() {
     return () => {
       ws.close();
     };
-  }, []);
+  }, [mounted]);
 
   const stopListening = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -215,7 +180,6 @@ export default function PatientComfort() {
   };
 
   const handleScreenTap = () => {
-    // Manual mode - only if session not active from dashboard
     if (!isSessionActive()) {
       if (isListening) {
         stopListening();
@@ -225,9 +189,9 @@ export default function PatientComfort() {
     }
   };
 
+  // Always render content
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Navigation */}
       <nav style={{
         background: 'rgba(255,255,255,0.95)',
         padding: '12px 24px',
@@ -252,20 +216,17 @@ export default function PatientComfort() {
         </div>
       </nav>
 
-      {/* Main content */}
       <div
         onClick={handleScreenTap}
         style={{
           flex: 1,
-          background: `linear-gradient(135deg, ${colors.bg1} 0%, ${colors.bg2} 100%)`,
+          background: 'linear-gradient(135deg, ' + colors.bg1 + ' 0%, ' + colors.bg2 + ' 100%)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           padding: '40px',
-          cursor: isSessionActive() ? 'default' : 'pointer',
-          transition: 'background 2s ease',
-          userSelect: 'none',
+          cursor: 'pointer',
         }}
       >
         <div style={{ marginBottom: '40px' }}>
@@ -276,7 +237,6 @@ export default function PatientComfort() {
               width: '200px',
               height: '200px',
               objectFit: 'contain',
-              animation: isListening ? 'pulse 1s infinite' : isPlaying ? 'bounce 0.5s infinite' : 'breathe 4s ease-in-out infinite',
             }}
           />
         </div>
@@ -288,20 +248,17 @@ export default function PatientComfort() {
             borderRadius: '50%',
             background: isConnected ? (isListening ? '#E74C3C' : isPlaying ? '#3498DB' : '#7A9B6D') : '#999',
             marginBottom: '20px',
-            animation: isListening ? 'pulse 1s infinite' : 'none',
           }}
         />
 
-        <p
-          style={{
-            color: colors.text,
-            fontSize: '1.8rem',
-            textAlign: 'center',
-            maxWidth: '600px',
-            lineHeight: 1.6,
-            fontWeight: 300,
-          }}
-        >
+        <p style={{
+          color: colors.text,
+          fontSize: '1.8rem',
+          textAlign: 'center',
+          maxWidth: '600px',
+          lineHeight: 1.6,
+          fontWeight: 300,
+        }}>
           {statusMessage}
         </p>
 
@@ -322,21 +279,6 @@ export default function PatientComfort() {
             Tap anywhere to talk
           </p>
         )}
-
-        <style jsx global>{`
-          @keyframes breathe {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-          }
-          @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.8; }
-          }
-          @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-          }
-        `}</style>
       </div>
     </div>
   );
