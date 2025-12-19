@@ -159,7 +159,9 @@ export default function PatientComfort() {
       console.log('WebSocket connected');
       setIsConnected(true);
       setStatusMessage('Hello! I\'m here with you.');
-      ws.send(JSON.stringify({ type: 'start_session' }));
+      const patientName = localStorage.getItem('everloved-patient-name') || '';
+      const caregiverName = localStorage.getItem('everloved-caregiver-name') || '';
+      ws.send(JSON.stringify({ type: 'start_session', patientName, caregiverName }));
     };
 
     ws.onmessage = (event) => {
