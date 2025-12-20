@@ -15,6 +15,7 @@ export default function AvatarConfiguration() {
   const [lifeStory, setLifeStory] = useState('');
   const [uploadedVideos, setUploadedVideos] = useState<{ name: string; data: string }[]>([]);
   const [uploadedMemoryPhotos, setUploadedMemoryPhotos] = useState<string[]>([]);
+  const [starredPhotoIndex, setStarredPhotoIndex] = useState<number>(0);
   const [uploadedMusic, setUploadedMusic] = useState<{ name: string; data: string }[]>([]);
   const [voiceStyle, setVoiceStyle] = useState('gentle');
   const [toneAnchors, setToneAnchors] = useState({ calm: true, jovial: true, authoritative: false });
@@ -58,6 +59,8 @@ export default function AvatarConfiguration() {
       if (savedRelationship) setRelationship(savedRelationship);
       const savedMemoryPhotos = localStorage.getItem('everloved-memory-photos');
       if (savedMemoryPhotos) setUploadedMemoryPhotos(JSON.parse(savedMemoryPhotos));
+      const savedStarred = localStorage.getItem("everloved-starred-photo");
+      if (savedStarred) setStarredPhotoIndex(parseInt(savedStarred));
       const savedVideos = localStorage.getItem('everloved-videos');
       if (savedVideos) setUploadedVideos(JSON.parse(savedVideos));
       const savedMusic = localStorage.getItem('everloved-music');
@@ -125,6 +128,11 @@ export default function AvatarConfiguration() {
       try { localStorage.setItem('everloved-memory-photos', JSON.stringify(updated)); } catch (e) {}
       return updated;
     });
+  };
+
+  const handleStarPhoto = (index: number) => {
+    setStarredPhotoIndex(index);
+    localStorage.setItem("everloved-starred-photo", index.toString());
   };
 
   const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -408,6 +416,7 @@ export default function AvatarConfiguration() {
               {uploadedMemoryPhotos.map((photo, i) => (
                 <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: '8px', overflow: 'hidden' }}>
                   <img src={photo} alt={`Memory ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button onClick={() => handleStarPhoto(i)} style={{ position: "absolute", top: "4px", left: "4px", background: i === starredPhotoIndex ? "#FFD700" : "rgba(255,255,255,0.7)", color: i === starredPhotoIndex ? "#fff" : "#999", border: "none", borderRadius: "50%", width: "20px", height: "20px", cursor: "pointer", fontSize: "10px" }}>★</button>
                   <button onClick={() => handleRemoveMemoryPhoto(i)} style={{
                     position: 'absolute', top: '4px', right: '4px', background: colors.danger, color: '#fff',
                     border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '10px',
