@@ -136,7 +136,7 @@ export default function PatientComfort() {
         setTimeout(() => {
           setShowComfort(false);
           setComfortMode('none');
-          stopBackgroundMusic();
+          // let music finish
         }, 30000);
       }
     } else if (severity >= 3) {
@@ -148,7 +148,7 @@ export default function PatientComfort() {
       setTimeout(() => {
         setScreenDimmed(false);
         setComfortMode('none');
-        stopBackgroundMusic();
+        // let music finish
       }, 45000);
     }
   };
@@ -158,7 +158,7 @@ export default function PatientComfort() {
     setIsListening(false);
     setIsProcessing(false);
     setStatusMessage('');
-    stopBackgroundMusic();
+    // let music finish
     
     // Play 528Hz calming tone
     try {
@@ -344,7 +344,7 @@ export default function PatientComfort() {
 
     return () => {
       ws.close();
-      stopBackgroundMusic();
+      // let music finish
     };
   }, [mounted, failCount, killSwitchActive]);
 
@@ -359,14 +359,14 @@ export default function PatientComfort() {
     if (showComfort) {
       setShowComfort(false);
       setComfortMode('none');
-      stopBackgroundMusic();
+      // let music finish
       return;
     }
     
     if (screenDimmed) {
       setScreenDimmed(false);
       setComfortMode('none');
-      stopBackgroundMusic();
+      // let music finish
       return;
     }
     
