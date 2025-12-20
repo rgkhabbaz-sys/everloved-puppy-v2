@@ -1,34 +1,55 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+
+interface ConversationEntry {
+  timestamp: string;
+  speaker: 'patient' | 'companion' | 'system';
+  text: string;
+}
 
 export default function MonitoringDashboard() {
   const router = useRouter();
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionDuration, setSessionDuration] = useState(0);
   const [patientName, setPatientName] = useState('Your loved one');
+  const [conversation, setConversation] = useState<ConversationEntry[]>([]);
+  const [killSwitchTriggered, setKillSwitchTriggered] = useState(false);
+  
+  const conversationEndRef = useRef<HTMLDivElement>(null);
 
+  // Load initial state and poll for updates
   useEffect(() => {
-    // Load patient name from localStorage
     const saved = localStorage.getItem('everloved-patient-name');
     if (saved) setPatientName(saved);
 
-    // Check if session is active
-    const active = localStorage.getItem('everloved-session-active') === 'true';
-    setSessionActive(active);
+    const checkState = () => {
+      const active = localStorage.getItem('everloved-session-active') === 'true';
+      setSessionActive(active);
+      
+      const killSwitch = localStorage.getItem('everloved-kill-switch') === 'true';
+      setKillSwitchTriggered(killSwitch);
 
-    // Session timer
-    let interval: NodeJS.Timeout;
-    if (active) {
-      const startTime = parseInt(localStorage.getItem('everloved-session-start') || '0');
-      interval = setInterval(() => {
+      try {
+        const log = localStorage.getItem('everloved-conversation-log');
+        if (log) setConversation(JSON.parse(log));
+      } catch (e) {}
+
+      if (active) {
+        const startTime = parseInt(localStorage.getItem('everloved-session-start') || '0');
         setSessionDuration(Math.floor((Date.now() - startTime) / 1000));
-      }, 1000);
-    }
+      }
+    };
 
+    checkState();
+    const interval = setInterval(checkState, 1000);
     return () => clearInterval(interval);
-  }, [sessionActive]);
+  }, []);
+
+  useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conversation]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -36,16 +57,22 @@ export default function MonitoringDashboard() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  };
+
   const handleStartInteraction = () => {
     localStorage.setItem('everloved-session-active', 'true');
     localStorage.setItem('everloved-session-start', Date.now().toString());
-    setSessionActive(true);
+    localStorage.setItem('everloved-conversation-log', '[]');
+    localStorage.removeItem('everloved-kill-switch');
+    setConversation([]);
+    setKillSwitchTriggered(false);
     router.push('/');
   };
 
   const handleEndInteraction = () => {
     localStorage.setItem('everloved-session-active', 'false');
-    localStorage.removeItem('everloved-session-start');
     setSessionActive(false);
     setSessionDuration(0);
   };
@@ -58,6 +85,9 @@ export default function MonitoringDashboard() {
     danger: '#C47A7A',
     text: '#4A3D32',
     textMuted: '#8B7355',
+    patientBubble: '#E8F4EA',
+    companionBubble: '#F0E6D3',
+    systemBubble: '#FFE5E5',
   };
 
   return (
@@ -70,95 +100,71 @@ export default function MonitoringDashboard() {
           Control and monitor {patientName}&apos;s comfort sessions
         </p>
 
-        {/* Session Control Card */}
+        {killSwitchTriggered && (
+          <div style={{
+            background: colors.danger, color: '#fff', borderRadius: '12px',
+            padding: '20px', marginBottom: '24px',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <div>
+              <strong>⚠️ Kill Switch Activated</strong>
+              <p style={{ margin: '8px 0 0', opacity: 0.9 }}>
+                The system detected escalating distress and switched to calm mode.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.removeItem('everloved-kill-switch');
+                setKillSwitchTriggered(false);
+              }}
+              style={{
+                background: '#fff', color: colors.danger, border: 'none',
+                padding: '10px 20px', borderRadius: '8px', fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Reset
+            </button>
+          </div>
+        )}
+
         <div style={{
-          background: colors.card,
-          borderRadius: '20px',
-          padding: '32px',
-          marginBottom: '24px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          background: colors.card, borderRadius: '20px', padding: '32px',
+          marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         }}>
           <h2 style={{ color: colors.text, fontSize: '1.2rem', marginBottom: '24px' }}>
             Session Control
           </h2>
-
           <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
             {!sessionActive ? (
-              <button
-                onClick={handleStartInteraction}
-                style={{
-                  background: colors.success,
-                  color: '#fff',
-                  border: 'none',
-                  padding: '16px 32px',
-                  borderRadius: '12px',
-                  fontSize: '1.1rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                }}
-              >
+              <button onClick={handleStartInteraction} style={{
+                background: colors.success, color: '#fff', border: 'none',
+                padding: '16px 32px', borderRadius: '12px', fontSize: '1.1rem',
+                fontWeight: 600, cursor: 'pointer',
+              }}>
                 ▶️ Start Interaction
               </button>
             ) : (
               <>
-                <button
-                  onClick={handleEndInteraction}
-                  style={{
-                    background: colors.danger,
-                    color: '#fff',
-                    border: 'none',
-                    padding: '16px 32px',
-                    borderRadius: '12px',
-                    fontSize: '1.1rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                  }}
-                >
-                  ⏹️ End Interaction
-                </button>
-
-                <div style={{
-                  background: `${colors.success}20`,
-                  padding: '12px 20px',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
+                <button onClick={handleEndInteraction} style={{
+                  background: colors.danger, color: '#fff', border: 'none',
+                  padding: '16px 32px', borderRadius: '12px', fontSize: '1.1rem',
+                  fontWeight: 600, cursor: 'pointer',
                 }}>
+                  ⏹️ End Session
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{
-                    width: '12px',
-                    height: '12px',
-                    background: colors.success,
-                    borderRadius: '50%',
-                    animation: 'pulse 2s infinite',
+                    width: '12px', height: '12px', borderRadius: '50%',
+                    background: colors.success, animation: 'pulse 2s infinite',
                   }} />
-                  <span style={{ color: colors.success, fontWeight: 600 }}>
-                    Session Active
-                  </span>
-                  <span style={{ color: colors.textMuted }}>
-                    {formatDuration(sessionDuration)}
-                  </span>
+                  <span style={{ color: colors.success, fontWeight: 600 }}>Active</span>
+                  <span style={{ color: colors.textMuted }}>{formatDuration(sessionDuration)}</span>
                 </div>
-
-                <button
-                  onClick={() => router.push('/')}
-                  style={{
-                    background: colors.accent,
-                    color: '#fff',
-                    border: 'none',
-                    padding: '12px 24px',
-                    borderRadius: '10px',
-                    fontSize: '1rem',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                  }}
-                >
+                <button onClick={() => router.push('/')} style={{
+                  background: colors.accent, color: '#fff', border: 'none',
+                  padding: '12px 24px', borderRadius: '10px', fontSize: '1rem',
+                  fontWeight: 500, cursor: 'pointer',
+                }}>
                   👁️ View Patient Screen
                 </button>
               </>
@@ -166,73 +172,67 @@ export default function MonitoringDashboard() {
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '24px' }}>
+        <div style={{
+          background: colors.card, borderRadius: '20px', padding: '32px',
+          marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+        }}>
+          <h2 style={{ color: colors.text, fontSize: '1.2rem', marginBottom: '20px' }}>
+            Conversation Log
+          </h2>
           <div style={{
-            background: colors.card,
-            borderRadius: '16px',
-            padding: '24px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+            maxHeight: '400px', overflowY: 'auto',
+            display: 'flex', flexDirection: 'column', gap: '12px', padding: '8px',
           }}>
-            <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '8px' }}>Today&apos;s Sessions</p>
-            <p style={{ color: colors.text, fontSize: '2rem', fontWeight: 600 }}>3</p>
-          </div>
-          <div style={{
-            background: colors.card,
-            borderRadius: '16px',
-            padding: '24px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          }}>
-            <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '8px' }}>Avg. Duration</p>
-            <p style={{ color: colors.text, fontSize: '2rem', fontWeight: 600 }}>12m</p>
-          </div>
-          <div style={{
-            background: colors.card,
-            borderRadius: '16px',
-            padding: '24px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-          }}>
-            <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '8px' }}>Mood Trend</p>
-            <p style={{ color: colors.success, fontSize: '2rem', fontWeight: 600 }}>😊 Good</p>
+            {conversation.length === 0 ? (
+              <p style={{ color: colors.textMuted, textAlign: 'center', padding: '40px' }}>
+                {sessionActive ? 'Waiting for conversation...' : 'Start a session to see conversation'}
+              </p>
+            ) : (
+              conversation.map((entry, i) => (
+                <div key={i} style={{
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: entry.speaker === 'patient' ? 'flex-end' : 'flex-start',
+                }}>
+                  <div style={{
+                    background: entry.speaker === 'patient' ? colors.patientBubble 
+                      : entry.speaker === 'system' ? colors.systemBubble : colors.companionBubble,
+                    padding: '12px 16px', borderRadius: '16px', maxWidth: '80%',
+                  }}>
+                    <p style={{ margin: 0, color: colors.text, fontSize: '0.95rem' }}>{entry.text}</p>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: colors.textMuted, marginTop: '4px', padding: '0 8px' }}>
+                    {entry.speaker === 'patient' ? patientName : entry.speaker === 'system' ? 'System' : 'Companion'} • {formatTime(entry.timestamp)}
+                  </span>
+                </div>
+              ))
+            )}
+            <div ref={conversationEndRef} />
           </div>
         </div>
 
-        {/* Recent Activity */}
-        <div style={{
-          background: colors.card,
-          borderRadius: '20px',
-          padding: '32px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-        }}>
-          <h2 style={{ color: colors.text, fontSize: '1.2rem', marginBottom: '20px' }}>
-            Recent Activity
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {[
-              { time: '2:30 PM', event: 'Session ended', duration: '15 minutes' },
-              { time: '11:00 AM', event: 'Session ended', duration: '8 minutes' },
-              { time: '9:15 AM', event: 'Session ended', duration: '12 minutes' },
-            ].map((item, i) => (
-              <div key={i} style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                background: colors.bg,
-                borderRadius: '10px',
-              }}>
-                <span style={{ color: colors.textMuted }}>{item.time}</span>
-                <span style={{ color: colors.text }}>{item.event}</span>
-                <span style={{ color: colors.textMuted }}>{item.duration}</span>
-              </div>
-            ))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+          <div style={{ background: colors.card, borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+            <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '8px' }}>Messages</p>
+            <p style={{ color: colors.text, fontSize: '2rem', fontWeight: 600 }}>
+              {conversation.filter(c => c.speaker !== 'system').length}
+            </p>
+          </div>
+          <div style={{ background: colors.card, borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+            <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '8px' }}>Duration</p>
+            <p style={{ color: colors.text, fontSize: '2rem', fontWeight: 600 }}>
+              {sessionActive ? formatDuration(sessionDuration) : '--:--'}
+            </p>
+          </div>
+          <div style={{ background: colors.card, borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+            <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '8px' }}>Status</p>
+            <p style={{ color: killSwitchTriggered ? colors.danger : sessionActive ? colors.success : colors.textMuted, fontSize: '1.5rem', fontWeight: 600 }}>
+              {killSwitchTriggered ? '⚠️ Calm' : sessionActive ? '✅ Active' : '⏸️ Idle'}
+            </p>
           </div>
         </div>
 
         <style jsx global>{`
-          @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-          }
+          @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         `}</style>
       </div>
     </div>
