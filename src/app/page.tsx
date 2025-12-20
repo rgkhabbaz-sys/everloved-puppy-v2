@@ -10,6 +10,7 @@ export default function PatientComfort() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [failCount, setFailCount] = useState(0);
   
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -74,7 +75,6 @@ export default function PatientComfort() {
   };
 
   const startListening = async () => {
-    // Prevent starting if already busy
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     if (isListening || isPlaying || isProcessing) return;
 
@@ -140,19 +140,27 @@ export default function PatientComfort() {
         }
       } else if (data.type === 'transcription') {
         setStatusMessage('You said: "' + data.text + '"');
+        setFailCount(0); // Reset fail count on successful transcription
       } else if (data.type === 'response_text') {
+        // Check if this is a "didn't catch" response
+        if (data.text.includes("didn't catch")) {
+          setFailCount(prev => prev + 1);
+        }
         setStatusMessage(data.text);
       } else if (data.type === 'response_audio') {
         setIsProcessing(false);
         await playAudio(data.audio);
-        // After audio finishes, restart listening if session active
-        if (isSessionActive()) {
+        
+        // Only auto-restart if session active AND not too many fails
+        if (isSessionActive() && failCount < 2) {
           setTimeout(() => startListening(), 1000);
+        } else if (failCount >= 2) {
+          setStatusMessage("I'm having trouble hearing. Tap the screen when you're ready to talk.");
+          setFailCount(0);
         }
       } else if (data.type === 'response_end') {
         setIsProcessing(false);
-        // If no audio was sent, still restart listening
-        if (!isPlaying && isSessionActive()) {
+        if (!isPlaying && isSessionActive() && failCount < 2) {
           setTimeout(() => startListening(), 1000);
         }
       } else if (data.type === 'error') {
@@ -171,7 +179,7 @@ export default function PatientComfort() {
     };
 
     return () => ws.close();
-  }, [mounted]);
+  }, [mounted, failCount]);
 
   const stopListening = () => {
     if (mediaRecorderRef.current?.state === 'recording') {
@@ -181,10 +189,10 @@ export default function PatientComfort() {
   };
 
   const handleScreenTap = () => {
-    if (!isSessionActive()) {
-      if (isListening) stopListening();
-      else if (!isPlaying && !isProcessing) startListening();
-    }
+    // Reset fail count on manual tap
+    setFailCount(0);
+    if (isListening) stopListening();
+    else if (!isPlaying && !isProcessing) startListening();
   };
 
   return (
