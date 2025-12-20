@@ -11,12 +11,15 @@ export default function PatientComfort() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [failCount, setFailCount] = useState(0);
-  const [showComfort, setShowComfort] = useState(false);
   const [comfortPhotos, setComfortPhotos] = useState<string[]>([]);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [killSwitchActive, setKillSwitchActive] = useState(false);
-  const [comfortMode, setComfortMode] = useState<'none' | 'photos' | 'photos_music' | 'music_only'>('none');
   const [screenDimmed, setScreenDimmed] = useState(false);
+  
+  // Memory Anchor Photo State (Dr. Elahi Protocol)
+  const [showMemoryAnchor, setShowMemoryAnchor] = useState(false);
+  const [memoryAnchorOpacity, setMemoryAnchorOpacity] = useState(0);
+  const [memoryAnchorPhoto, setMemoryAnchorPhoto] = useState<string | null>(null);
   
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -24,6 +27,7 @@ export default function PatientComfort() {
   const hasAutoStarted = useRef(false);
   const comfortAudioRef = useRef<HTMLAudioElement | null>(null);
   const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
+  const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const saveToLog = (speaker: 'patient' | 'companion' | 'system', text: string) => {
     try {
@@ -59,6 +63,11 @@ export default function PatientComfort() {
     textMuted: '#8B7355',
   };
 
+  const isSundowningWindow = () => {
+    const hours = new Date().getHours();
+    return hours >= 16 && hours < 20;
+  };
+
   useEffect(() => {
     setMounted(true);
     setCircadianColors(getCircadianColors());
@@ -74,28 +83,94 @@ export default function PatientComfort() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (showComfort && comfortPhotos.length > 1) {
-      const interval = setInterval(() => {
-        setCurrentPhotoIndex(prev => (prev + 1) % comfortPhotos.length);
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [showComfort, comfortPhotos.length]);
-
   const isSessionActive = () => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('everloved-session-active') === 'true';
   };
 
-  // Play background comfort music
+  // Get the starred/primary photo, or first available
+  const getPrimaryPhoto = () => {
+    if (comfortPhotos.length === 0) return null;
+    const starredIndex = parseInt(localStorage.getItem('everloved-starred-photo') || '0');
+    return comfortPhotos[starredIndex] || comfortPhotos[0];
+  };
+
+  // Memory Anchor: Slow fade-in over 4 seconds (Dr. Elahi Protocol)
+  const showMemoryAnchorPhoto = (withAudio: boolean = false) => {
+    const photo = getPrimaryPhoto();
+    if (!photo) return;
+    
+    setMemoryAnchorPhoto(photo);
+    setShowMemoryAnchor(true);
+    setMemoryAnchorOpacity(0);
+    
+    // Clear any existing fade
+    if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+    
+    // Smooth fade-in over 4 seconds (ease-in-out approximation)
+    let progress = 0;
+    const duration = 4000; // 4 seconds
+    const steps = 60; // 60 steps for smooth animation
+    const stepDuration = duration / steps;
+    
+    fadeIntervalRef.current = setInterval(() => {
+      progress += 1 / steps;
+      // Ease-in-out curve: 3t^2 - 2t^3
+      const eased = progress * progress * (3 - 2 * progress);
+      setMemoryAnchorOpacity(eased);
+      
+      if (progress >= 1) {
+        if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+        setMemoryAnchorOpacity(1);
+      }
+    }, stepDuration);
+    
+    // Multi-modal sync hook: Start 528Hz-anchored audio if requested
+    if (withAudio) {
+      startBackgroundMusic();
+    }
+    
+    saveToLog('system', 'Memory anchor photo displayed (fade-in)');
+    
+    // Auto-dismiss after 45 seconds with fade-out
+    setTimeout(() => {
+      hideMemoryAnchorPhoto();
+    }, 45000);
+  };
+
+  const hideMemoryAnchorPhoto = () => {
+    if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+    
+    // Fade out over 2 seconds
+    let progress = 1;
+    const duration = 2000;
+    const steps = 30;
+    const stepDuration = duration / steps;
+    
+    fadeIntervalRef.current = setInterval(() => {
+      progress -= 1 / steps;
+      const eased = Math.max(0, progress * progress * (3 - 2 * progress));
+      setMemoryAnchorOpacity(eased);
+      
+      if (progress <= 0) {
+        if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+        setShowMemoryAnchor(false);
+        setMemoryAnchorPhoto(null);
+      }
+    }, stepDuration);
+  };
+
+  // Play background comfort music (528Hz-anchored audio from peak memory era)
   const startBackgroundMusic = () => {
     try {
-      const musicData = localStorage.getItem('everloved-music'); const musicArray = musicData ? JSON.parse(musicData) : []; const uploadedMusic = musicArray.length > 0 ? musicArray[0].data : null;
+      const musicData = localStorage.getItem('everloved-music');
+      const musicArray = musicData ? JSON.parse(musicData) : [];
+      const uploadedMusic = musicArray.length > 0 ? musicArray[0].data : null;
+      
       if (uploadedMusic) {
         backgroundMusicRef.current = new Audio(uploadedMusic);
-        backgroundMusicRef.current.loop = true;
-        backgroundMusicRef.current.volume = 0.2;
+        backgroundMusicRef.current.loop = false; // Play full track once
+        backgroundMusicRef.current.volume = 0.25;
         backgroundMusicRef.current.play().catch(console.error);
       }
     } catch (e) {
@@ -110,45 +185,25 @@ export default function PatientComfort() {
     }
   };
 
-  // Handle comfort interventions based on severity
+  // Handle comfort interventions based on severity (Dr. Elahi Protocol)
   const handleComfortIntervention = (severity: number, state: string) => {
     console.log('Comfort intervention:', severity, state);
     saveToLog('system', `Comfort level ${severity}: ${state}`);
     
-    if (severity === 1) {
-      // Mild: Photos only
-      if (comfortPhotos.length > 0) {
-        setComfortMode('photos');
-        const starredIndex = parseInt(localStorage.getItem("everloved-starred-photo") || "0"); setCurrentPhotoIndex(starredIndex); setShowComfort(true);
-        setScreenDimmed(false);
-        setTimeout(() => {
-          setShowComfort(false);
-          setComfortMode('none');
-        }, 20000);
-      }
+    const sundowning = isSundowningWindow();
+    
+    if (severity === 1 || (sundowning && severity >= 1)) {
+      // Mild distress OR sundowning: Memory Anchor photo (no overlay, side placement)
+      showMemoryAnchorPhoto(false);
     } else if (severity === 2) {
-      // Moderate: Photos + background music
-      if (comfortPhotos.length > 0) {
-        setComfortMode('photos_music');
-        const starredIndex = parseInt(localStorage.getItem("everloved-starred-photo") || "0"); setCurrentPhotoIndex(starredIndex); setShowComfort(true);
-        setScreenDimmed(false);
-        startBackgroundMusic();
-        setTimeout(() => {
-          setShowComfort(false);
-          setComfortMode('none');
-          // let music finish
-        }, 30000);
-      }
+      // Moderate: Memory Anchor photo + background music (multi-modal)
+      showMemoryAnchorPhoto(true);
     } else if (severity >= 3) {
       // Severe: Music only, dim screen (reduce visual stimulation)
-      setComfortMode('music_only');
-      setShowComfort(false);
       setScreenDimmed(true);
       startBackgroundMusic();
       setTimeout(() => {
         setScreenDimmed(false);
-        setComfortMode('none');
-        // let music finish
       }, 45000);
     }
   };
@@ -158,11 +213,15 @@ export default function PatientComfort() {
     setIsListening(false);
     setIsProcessing(false);
     setStatusMessage('');
+    setShowMemoryAnchor(false);
     // let music finish
     
-    // Play 528Hz calming tone
+    // Play 528Hz calming tone or uploaded music
     try {
-      const musicData = localStorage.getItem('everloved-music'); const musicArray = musicData ? JSON.parse(musicData) : []; const uploadedMusic = musicArray.length > 0 ? musicArray[0].data : null;
+      const musicData = localStorage.getItem('everloved-music');
+      const musicArray = musicData ? JSON.parse(musicData) : [];
+      const uploadedMusic = musicArray.length > 0 ? musicArray[0].data : null;
+      
       if (uploadedMusic) {
         comfortAudioRef.current = new Audio(uploadedMusic);
         comfortAudioRef.current.loop = true;
@@ -191,7 +250,6 @@ export default function PatientComfort() {
   const resetKillSwitch = () => {
     setKillSwitchActive(false);
     setScreenDimmed(false);
-    setComfortMode('none');
     
     if (comfortAudioRef.current) {
       comfortAudioRef.current.pause();
@@ -345,6 +403,7 @@ export default function PatientComfort() {
     return () => {
       ws.close();
       // let music finish
+      if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
     };
   }, [mounted, failCount, killSwitchActive]);
 
@@ -356,17 +415,14 @@ export default function PatientComfort() {
   };
 
   const handleScreenTap = () => {
-    if (showComfort) {
-      setShowComfort(false);
-      setComfortMode('none');
-      // let music finish
+    // Dismiss memory anchor on tap
+    if (showMemoryAnchor) {
+      hideMemoryAnchorPhoto();
       return;
     }
     
     if (screenDimmed) {
       setScreenDimmed(false);
-      setComfortMode('none');
-      // let music finish
       return;
     }
     
@@ -465,9 +521,15 @@ export default function PatientComfort() {
           background: screenDimmed 
             ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
             : 'linear-gradient(135deg, ' + circadianColors.bg1 + ' 0%, ' + circadianColors.bg2 + ' 100%)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          padding: '40px', cursor: 'pointer', transition: 'background 2s ease',
+          display: 'flex', 
+          flexDirection: 'row', // Changed to row for side-by-side layout
+          alignItems: 'center', 
+          justifyContent: 'center',
+          padding: '40px', 
+          cursor: 'pointer', 
+          transition: 'background 2s ease',
           position: 'relative',
+          gap: '40px',
         }}
       >
         {/* Severe distress: dimmed screen with music indicator */}
@@ -492,41 +554,9 @@ export default function PatientComfort() {
           </div>
         )}
 
-        {/* Comfort photo overlay */}
-        {showComfort && comfortPhotos.length > 0 && !screenDimmed && (
-          <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.7)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            zIndex: 5,
-          }}>
-            <div style={{
-              maxWidth: '80%', maxHeight: '70%',
-              borderRadius: '20px', overflow: 'hidden',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-            }}>
-              <img 
-                src={comfortPhotos[currentPhotoIndex]} 
-                alt="Memory"
-                style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain' }}
-              />
-            </div>
-            {comfortMode === 'photos_music' && (
-              <p style={{ color: '#fff', fontSize: '1rem', opacity: 0.7, marginTop: '20px' }}>
-                🎵 Playing comfort music...
-              </p>
-            )}
-            <p style={{
-              position: 'absolute', bottom: '40px',
-              color: '#fff', fontSize: '1rem', opacity: 0.6,
-            }}>
-              Tap anywhere to close
-            </p>
-          </div>
-        )}
-
+        {/* Main content area - puppy and status */}
         {!screenDimmed && (
-          <>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '0 0 auto' }}>
             <div style={{ marginBottom: '40px' }}>
               <img src="/puppy.png" alt="Comfort companion" style={{ width: '200px', height: '200px', objectFit: 'contain' }} />
             </div>
@@ -540,7 +570,7 @@ export default function PatientComfort() {
             {statusMessage && (
               <p style={{
                 color: circadianColors.text, fontSize: '1.8rem', textAlign: 'center',
-                maxWidth: '600px', lineHeight: 1.6, fontWeight: 300,
+                maxWidth: '500px', lineHeight: 1.6, fontWeight: 300,
               }}>
                 {statusMessage}
               </p>
@@ -563,7 +593,49 @@ export default function PatientComfort() {
                 💭 Thinking...
               </p>
             )}
-          </>
+          </div>
+        )}
+
+        {/* Memory Anchor Photo - Side placement (Dr. Elahi Protocol) */}
+        {showMemoryAnchor && memoryAnchorPhoto && !screenDimmed && (
+          <div style={{
+            flex: '0 0 auto',
+            width: '35vw', // 30-40% of screen width
+            maxWidth: '400px',
+            opacity: memoryAnchorOpacity,
+            transition: 'none', // We handle animation manually for precise control
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}>
+            <div style={{
+              borderRadius: '20px',
+              overflow: 'hidden',
+              boxShadow: `0 10px 40px rgba(0,0,0,${0.15 * memoryAnchorOpacity})`,
+              border: '4px solid rgba(255,255,255,0.3)',
+            }}>
+              <img 
+                src={memoryAnchorPhoto} 
+                alt="Memory"
+                style={{ 
+                  width: '100%', 
+                  height: 'auto',
+                  maxHeight: '50vh',
+                  objectFit: 'contain',
+                  display: 'block',
+                }}
+              />
+            </div>
+            <p style={{
+              color: circadianColors.text,
+              fontSize: '0.9rem',
+              opacity: 0.5 * memoryAnchorOpacity,
+              marginTop: '12px',
+              textAlign: 'center',
+            }}>
+              Tap to dismiss
+            </p>
+          </div>
         )}
       </div>
 
