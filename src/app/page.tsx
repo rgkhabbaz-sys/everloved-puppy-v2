@@ -15,12 +15,23 @@ export default function PatientComfort() {
   const [comfortPhotos, setComfortPhotos] = useState<string[]>([]);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [killSwitchActive, setKillSwitchActive] = useState(false);
+  const [comfortMode, setComfortMode] = useState<'none' | 'photos' | 'photos_music' | 'music_only'>('none');
+  const [screenDimmed, setScreenDimmed] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const hasAutoStarted = useRef(false);
   const comfortAudioRef = useRef<HTMLAudioElement | null>(null);
+  const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
+
+  const saveToLog = (speaker: 'patient' | 'companion' | 'system', text: string) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('everloved-conversation-log') || '[]');
+      existing.push({ timestamp: new Date().toISOString(), speaker, text });
+      localStorage.setItem('everloved-conversation-log', JSON.stringify(existing));
+    } catch (e) { console.error('Log error:', e); }
+  };
 
   const getCircadianColors = () => {
     const now = new Date();
@@ -41,14 +52,6 @@ export default function PatientComfort() {
   };
 
   const [circadianColors, setCircadianColors] = useState({ bg1: '#F0F7FF', bg2: '#E1EFFE', text: '#2C3E50' });
-
-  const saveToLog = (speaker: 'patient' | 'companion' | 'system', text: string) => {
-    try {
-      const existing = JSON.parse(localStorage.getItem('everloved-conversation-log') || '[]');
-      existing.push({ timestamp: new Date().toISOString(), speaker, text });
-      localStorage.setItem('everloved-conversation-log', JSON.stringify(existing));
-    } catch (e) { console.error('Log error:', e); }
-  };
 
   const uiColors = {
     cardBg: 'rgba(255, 255, 255, 0.92)',
@@ -85,47 +88,100 @@ export default function PatientComfort() {
     return localStorage.getItem('everloved-session-active') === 'true';
   };
 
+  // Play background comfort music
+  const startBackgroundMusic = () => {
+    try {
+      const uploadedMusic = localStorage.getItem('everloved-comfort-music');
+      if (uploadedMusic) {
+        backgroundMusicRef.current = new Audio(uploadedMusic);
+        backgroundMusicRef.current.loop = true;
+        backgroundMusicRef.current.volume = 0.2;
+        backgroundMusicRef.current.play().catch(console.error);
+      }
+    } catch (e) {
+      console.error('Error playing background music:', e);
+    }
+  };
+
+  const stopBackgroundMusic = () => {
+    if (backgroundMusicRef.current) {
+      backgroundMusicRef.current.pause();
+      backgroundMusicRef.current = null;
+    }
+  };
+
+  // Handle comfort interventions based on severity
+  const handleComfortIntervention = (severity: number, state: string) => {
+    console.log('Comfort intervention:', severity, state);
+    saveToLog('system', `Comfort level ${severity}: ${state}`);
+    
+    if (severity === 1) {
+      // Mild: Photos only
+      if (comfortPhotos.length > 0) {
+        setComfortMode('photos');
+        setShowComfort(true);
+        setScreenDimmed(false);
+        setTimeout(() => {
+          setShowComfort(false);
+          setComfortMode('none');
+        }, 20000);
+      }
+    } else if (severity === 2) {
+      // Moderate: Photos + background music
+      if (comfortPhotos.length > 0) {
+        setComfortMode('photos_music');
+        setShowComfort(true);
+        setScreenDimmed(false);
+        startBackgroundMusic();
+        setTimeout(() => {
+          setShowComfort(false);
+          setComfortMode('none');
+          stopBackgroundMusic();
+        }, 30000);
+      }
+    } else if (severity >= 3) {
+      // Severe: Music only, dim screen (reduce visual stimulation)
+      setComfortMode('music_only');
+      setShowComfort(false);
+      setScreenDimmed(true);
+      startBackgroundMusic();
+      setTimeout(() => {
+        setScreenDimmed(false);
+        setComfortMode('none');
+        stopBackgroundMusic();
+      }, 45000);
+    }
+  };
+
   const activateKillSwitch = () => {
     setKillSwitchActive(true);
     setIsListening(false);
     setIsProcessing(false);
     setStatusMessage('');
+    stopBackgroundMusic();
     
-    // Play comfort music (using a royalty-free calming loop)
-    // In production, this would be caregiver-uploaded music
-    if (comfortAudioRef.current) {
-      comfortAudioRef.current.pause();
-    }
-    
-    // Try to play uploaded comfort music, or use built-in
+    // Play 528Hz calming tone
     try {
       const uploadedMusic = localStorage.getItem('everloved-comfort-music');
       if (uploadedMusic) {
         comfortAudioRef.current = new Audio(uploadedMusic);
+        comfortAudioRef.current.loop = true;
+        comfortAudioRef.current.volume = 0.3;
+        comfortAudioRef.current.play().catch(console.error);
       } else {
-        // Fallback: generate a simple calming tone
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
         
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.value = 528; // 528Hz - "healing frequency"
+        oscillator.frequency.value = 528;
         oscillator.type = 'sine';
         gainNode.gain.value = 0.1;
-        
         oscillator.start();
         
-        // Store reference to stop later
         (window as any).killSwitchOscillator = oscillator;
         (window as any).killSwitchAudioContext = audioContext;
-      }
-      
-      if (comfortAudioRef.current) {
-        comfortAudioRef.current.loop = true;
-        comfortAudioRef.current.volume = 0.3;
-        comfortAudioRef.current.play().catch(console.error);
       }
     } catch (e) {
       console.error('Error playing comfort audio:', e);
@@ -134,20 +190,19 @@ export default function PatientComfort() {
 
   const resetKillSwitch = () => {
     setKillSwitchActive(false);
+    setScreenDimmed(false);
+    setComfortMode('none');
     
-    // Stop comfort audio
     if (comfortAudioRef.current) {
       comfortAudioRef.current.pause();
       comfortAudioRef.current = null;
     }
     
-    // Stop oscillator if used
     if ((window as any).killSwitchOscillator) {
       (window as any).killSwitchOscillator.stop();
       (window as any).killSwitchAudioContext.close();
     }
     
-    // Reset session
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'reset_kill_switch' }));
     }
@@ -243,6 +298,8 @@ export default function PatientComfort() {
         activateKillSwitch();
         localStorage.setItem('everloved-kill-switch', 'true');
         saveToLog('system', 'Kill switch activated: ' + data.reason);
+      } else if (data.type === 'comfort_intervention') {
+        handleComfortIntervention(data.severity, data.state);
       } else if (data.type === 'transcription') {
         setStatusMessage('You said: "' + data.text + '"');
         saveToLog('patient', data.text);
@@ -251,13 +308,8 @@ export default function PatientComfort() {
         if (data.text.includes("didn't catch")) {
           setFailCount(prev => prev + 1);
         }
-        setStatusMessage(data.text); saveToLog("companion", data.text);
-      } else if (data.type === 'show_comfort') {
-        if (comfortPhotos.length > 0) {
-          setShowComfort(true);
-          setCurrentPhotoIndex(0);
-          setTimeout(() => setShowComfort(false), 30000);
-        }
+        setStatusMessage(data.text);
+        saveToLog('companion', data.text);
       } else if (data.type === 'response_audio') {
         setIsProcessing(false);
         await playAudio(data.audio);
@@ -290,8 +342,11 @@ export default function PatientComfort() {
       }
     };
 
-    return () => ws.close();
-  }, [mounted, failCount, comfortPhotos.length, killSwitchActive]);
+    return () => {
+      ws.close();
+      stopBackgroundMusic();
+    };
+  }, [mounted, failCount, killSwitchActive]);
 
   const stopListening = () => {
     if (mediaRecorderRef.current?.state === 'recording') {
@@ -303,10 +358,19 @@ export default function PatientComfort() {
   const handleScreenTap = () => {
     if (showComfort) {
       setShowComfort(false);
+      setComfortMode('none');
+      stopBackgroundMusic();
       return;
     }
     
-    if (killSwitchActive) return; // Only caregiver can reset
+    if (screenDimmed) {
+      setScreenDimmed(false);
+      setComfortMode('none');
+      stopBackgroundMusic();
+      return;
+    }
+    
+    if (killSwitchActive) return;
     
     setFailCount(0);
     if (isListening) stopListening();
@@ -325,7 +389,6 @@ export default function PatientComfort() {
         justifyContent: 'center',
         padding: '40px',
       }}>
-        {/* Pulsing calm orb */}
         <div style={{
           width: '200px',
           height: '200px',
@@ -348,7 +411,6 @@ export default function PatientComfort() {
           Just relax and breathe.
         </p>
 
-        {/* Caregiver reset button - small and unobtrusive */}
         <Link
           href="/caregiver/monitoring"
           onClick={(e) => {
@@ -400,77 +462,117 @@ export default function PatientComfort() {
         onClick={handleScreenTap}
         style={{
           flex: 1,
-          background: 'linear-gradient(135deg, ' + circadianColors.bg1 + ' 0%, ' + circadianColors.bg2 + ' 100%)',
+          background: screenDimmed 
+            ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
+            : 'linear-gradient(135deg, ' + circadianColors.bg1 + ' 0%, ' + circadianColors.bg2 + ' 100%)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           padding: '40px', cursor: 'pointer', transition: 'background 2s ease',
           position: 'relative',
         }}
       >
-        {/* Comfort photo overlay */}
-        {showComfort && comfortPhotos.length > 0 && (
+        {/* Severe distress: dimmed screen with music indicator */}
+        {screenDimmed && (
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.7)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             zIndex: 5,
           }}>
             <div style={{
-              maxWidth: '80%', maxHeight: '80%',
+              width: '150px', height: '150px', borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(100,149,237,0.4) 0%, rgba(100,149,237,0.1) 70%)',
+              animation: 'pulse 4s ease-in-out infinite',
+              marginBottom: '40px',
+            }} />
+            <p style={{ color: '#a0c4ff', fontSize: '1.2rem', opacity: 0.8 }}>
+              🎵 Calming music playing...
+            </p>
+            <p style={{ color: '#a0c4ff', fontSize: '0.9rem', opacity: 0.5, marginTop: '20px' }}>
+              Tap anywhere to dismiss
+            </p>
+          </div>
+        )}
+
+        {/* Comfort photo overlay */}
+        {showComfort && comfortPhotos.length > 0 && !screenDimmed && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            zIndex: 5,
+          }}>
+            <div style={{
+              maxWidth: '80%', maxHeight: '70%',
               borderRadius: '20px', overflow: 'hidden',
               boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
             }}>
               <img 
                 src={comfortPhotos[currentPhotoIndex]} 
                 alt="Memory"
-                style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
+                style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain' }}
               />
             </div>
+            {comfortMode === 'photos_music' && (
+              <p style={{ color: '#fff', fontSize: '1rem', opacity: 0.7, marginTop: '20px' }}>
+                🎵 Playing comfort music...
+              </p>
+            )}
             <p style={{
               position: 'absolute', bottom: '40px',
-              color: '#fff', fontSize: '1.2rem', opacity: 0.8,
+              color: '#fff', fontSize: '1rem', opacity: 0.6,
             }}>
               Tap anywhere to close
             </p>
           </div>
         )}
 
-        <div style={{ marginBottom: '40px' }}>
-          <img src="/puppy.png" alt="Comfort companion" style={{ width: '200px', height: '200px', objectFit: 'contain' }} />
-        </div>
+        {!screenDimmed && (
+          <>
+            <div style={{ marginBottom: '40px' }}>
+              <img src="/puppy.png" alt="Comfort companion" style={{ width: '200px', height: '200px', objectFit: 'contain' }} />
+            </div>
 
-        <div style={{
-          width: '20px', height: '20px', borderRadius: '50%',
-          background: isConnected ? (isListening ? '#E74C3C' : isPlaying ? '#3498DB' : isProcessing ? '#F39C12' : '#7A9B6D') : '#999',
-          marginBottom: '20px',
-        }} />
+            <div style={{
+              width: '20px', height: '20px', borderRadius: '50%',
+              background: isConnected ? (isListening ? '#E74C3C' : isPlaying ? '#3498DB' : isProcessing ? '#F39C12' : '#7A9B6D') : '#999',
+              marginBottom: '20px',
+            }} />
 
-        {statusMessage && (
-          <p style={{
-            color: circadianColors.text, fontSize: '1.8rem', textAlign: 'center',
-            maxWidth: '600px', lineHeight: 1.6, fontWeight: 300,
-          }}>
-            {statusMessage}
-          </p>
-        )}
+            {statusMessage && (
+              <p style={{
+                color: circadianColors.text, fontSize: '1.8rem', textAlign: 'center',
+                maxWidth: '600px', lineHeight: 1.6, fontWeight: 300,
+              }}>
+                {statusMessage}
+              </p>
+            )}
 
-        {isListening && (
-          <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
-            🎙️ Listening...
-          </p>
-        )}
+            {isListening && (
+              <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
+                🎙️ Listening...
+              </p>
+            )}
 
-        {isPlaying && (
-          <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
-            🔊 Speaking...
-          </p>
-        )}
+            {isPlaying && (
+              <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
+                🔊 Speaking...
+              </p>
+            )}
 
-        {isProcessing && !isPlaying && (
-          <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
-            💭 Thinking...
-          </p>
+            {isProcessing && !isPlaying && (
+              <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
+                💭 Thinking...
+              </p>
+            )}
+          </>
         )}
       </div>
+
+      <style jsx>{`
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 0.6; }
+          50% { transform: scale(1.1); opacity: 0.8; }
+        }
+      `}</style>
     </div>
   );
 }
