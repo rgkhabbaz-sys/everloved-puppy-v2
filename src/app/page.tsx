@@ -109,7 +109,7 @@ export default function PatientComfort() {
           mediaRecorder.stop();
           setIsListening(false);
         }
-      }, 4000);
+      }, 5000);
 
     } catch (error) {
       console.error('Microphone error:', error);
