@@ -119,7 +119,7 @@ export default function PatientComfort() {
       // Mild: Photos only
       if (comfortPhotos.length > 0) {
         setComfortMode('photos');
-        setShowComfort(true);
+        const starredIndex = parseInt(localStorage.getItem("everloved-starred-photo") || "0"); setCurrentPhotoIndex(starredIndex); setShowComfort(true);
         setScreenDimmed(false);
         setTimeout(() => {
           setShowComfort(false);
@@ -130,7 +130,7 @@ export default function PatientComfort() {
       // Moderate: Photos + background music
       if (comfortPhotos.length > 0) {
         setComfortMode('photos_music');
-        setShowComfort(true);
+        const starredIndex = parseInt(localStorage.getItem("everloved-starred-photo") || "0"); setCurrentPhotoIndex(starredIndex); setShowComfort(true);
         setScreenDimmed(false);
         startBackgroundMusic();
         setTimeout(() => {
