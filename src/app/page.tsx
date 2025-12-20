@@ -591,7 +591,8 @@ export default function PatientComfort() {
         </Link>
 
         <style jsx>{`
-          @keyframes pulse {
+          @keyframes photoBreath { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+        @keyframes pulse {
             0%, 100% { transform: scale(1); opacity: 0.6; }
             50% { transform: scale(1.1); opacity: 0.8; }
           }
@@ -669,7 +670,7 @@ export default function PatientComfort() {
               borderRadius: '20px',
               overflow: 'hidden',
               boxShadow: `0 10px 40px rgba(0,0,0,${0.15 * memoryAnchorOpacity})`,
-              border: '4px solid rgba(255,255,255,0.3)',
+              border: "4px solid rgba(255,255,255,0.3)", animation: "photoBreath 4s ease-in-out infinite",
             }}>
               <img 
                 src={memoryAnchorPhoto} 
@@ -743,6 +744,7 @@ export default function PatientComfort() {
       </div>
 
       <style jsx>{`
+        @keyframes photoBreath { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
         @keyframes pulse {
           0%, 100% { transform: scale(1); opacity: 0.6; }
           50% { transform: scale(1.1); opacity: 0.8; }
