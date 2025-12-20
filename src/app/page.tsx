@@ -42,6 +42,14 @@ export default function PatientComfort() {
 
   const [circadianColors, setCircadianColors] = useState({ bg1: '#F0F7FF', bg2: '#E1EFFE', text: '#2C3E50' });
 
+  const saveToLog = (speaker: 'patient' | 'companion' | 'system', text: string) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('everloved-conversation-log') || '[]');
+      existing.push({ timestamp: new Date().toISOString(), speaker, text });
+      localStorage.setItem('everloved-conversation-log', JSON.stringify(existing));
+    } catch (e) { console.error('Log error:', e); }
+  };
+
   const uiColors = {
     cardBg: 'rgba(255, 255, 255, 0.92)',
     cardBorder: 'rgba(232, 201, 160, 0.4)',
@@ -233,8 +241,11 @@ export default function PatientComfort() {
       } else if (data.type === 'kill_switch') {
         console.log('🚨 Kill switch activated:', data.reason);
         activateKillSwitch();
+        localStorage.setItem('everloved-kill-switch', 'true');
+        saveToLog('system', 'Kill switch activated: ' + data.reason);
       } else if (data.type === 'transcription') {
         setStatusMessage('You said: "' + data.text + '"');
+        saveToLog('patient', data.text);
         setFailCount(0);
       } else if (data.type === 'response_text') {
         if (data.text.includes("didn't catch")) {
