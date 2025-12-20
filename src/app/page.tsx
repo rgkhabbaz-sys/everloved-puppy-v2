@@ -8,6 +8,7 @@ export default function PatientComfort() {
   const [isListening, setIsListening] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [mounted, setMounted] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
@@ -73,8 +74,9 @@ export default function PatientComfort() {
   };
 
   const startListening = async () => {
+    // Prevent starting if already busy
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    if (isListening || isPlaying) return;
+    if (isListening || isPlaying || isProcessing) return;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -87,12 +89,12 @@ export default function PatientComfort() {
       };
 
       mediaRecorder.onstop = () => {
+        setIsProcessing(true);
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64 = (reader.result as string).split(',')[1];
           wsRef.current?.send(JSON.stringify({ type: 'audio_data', audio: base64 }));
-          setStatusMessage('...');
         };
         reader.readAsDataURL(audioBlob);
         stream.getTracks().forEach(track => track.stop());
@@ -123,7 +125,6 @@ export default function PatientComfort() {
 
     ws.onopen = () => {
       setIsConnected(true);
-      // Don't show message until session actually starts
       const patientName = localStorage.getItem('everloved-patient-name') || '';
       const caregiverName = localStorage.getItem('everloved-caregiver-name') || '';
       ws.send(JSON.stringify({ type: 'start_session', patientName, caregiverName }));
@@ -133,32 +134,29 @@ export default function PatientComfort() {
       const data = JSON.parse(event.data);
       
       if (data.type === 'session_started') {
-        // Auto-start if coming from dashboard
         if (isSessionActive() && !hasAutoStarted.current) {
           hasAutoStarted.current = true;
           setTimeout(() => startListening(), 500);
         }
       } else if (data.type === 'transcription') {
         setStatusMessage('You said: "' + data.text + '"');
-      } else if (data.type === 'response_chunk') {
-        setStatusMessage(prev => {
-          if (prev.startsWith('You said:') || prev === '...') return data.text;
-          return prev + data.text;
-        });
       } else if (data.type === 'response_text') {
         setStatusMessage(data.text);
       } else if (data.type === 'response_audio') {
+        setIsProcessing(false);
         await playAudio(data.audio);
         // After audio finishes, restart listening if session active
         if (isSessionActive()) {
-          setTimeout(() => startListening(), 800);
+          setTimeout(() => startListening(), 1000);
         }
       } else if (data.type === 'response_end') {
-        // If no audio was sent, restart listening
+        setIsProcessing(false);
+        // If no audio was sent, still restart listening
         if (!isPlaying && isSessionActive()) {
-          setTimeout(() => startListening(), 800);
+          setTimeout(() => startListening(), 1000);
         }
       } else if (data.type === 'error') {
+        setIsProcessing(false);
         setStatusMessage('Let me try again...');
         if (isSessionActive()) {
           setTimeout(() => startListening(), 1500);
@@ -185,7 +183,7 @@ export default function PatientComfort() {
   const handleScreenTap = () => {
     if (!isSessionActive()) {
       if (isListening) stopListening();
-      else if (!isPlaying) startListening();
+      else if (!isPlaying && !isProcessing) startListening();
     }
   };
 
@@ -219,7 +217,7 @@ export default function PatientComfort() {
 
         <div style={{
           width: '20px', height: '20px', borderRadius: '50%',
-          background: isConnected ? (isListening ? '#E74C3C' : isPlaying ? '#3498DB' : '#7A9B6D') : '#999',
+          background: isConnected ? (isListening ? '#E74C3C' : isPlaying ? '#3498DB' : isProcessing ? '#F39C12' : '#7A9B6D') : '#999',
           marginBottom: '20px',
         }} />
 
@@ -244,9 +242,9 @@ export default function PatientComfort() {
           </p>
         )}
 
-        {!isSessionActive() && !isListening && !isPlaying && isConnected && !statusMessage && (
-          <p style={{ color: circadianColors.text, opacity: 0.5, marginTop: '30px', fontSize: '1rem' }}>
-            Tap anywhere to talk
+        {isProcessing && !isPlaying && (
+          <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
+            💭 Thinking...
           </p>
         )}
       </div>
