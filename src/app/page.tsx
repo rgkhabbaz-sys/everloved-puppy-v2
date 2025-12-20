@@ -11,6 +11,9 @@ export default function PatientComfort() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [failCount, setFailCount] = useState(0);
+  const [showComfort, setShowComfort] = useState(false);
+  const [comfortPhotos, setComfortPhotos] = useState<string[]>([]);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -47,8 +50,29 @@ export default function PatientComfort() {
     setMounted(true);
     setCircadianColors(getCircadianColors());
     const interval = setInterval(() => setCircadianColors(getCircadianColors()), 60000);
+    
+    // Load comfort photos from localStorage
+    try {
+      const photos = localStorage.getItem('everloved-memory-photos');
+      if (photos) {
+        setComfortPhotos(JSON.parse(photos));
+      }
+    } catch (e) {
+      console.error('Error loading comfort photos:', e);
+    }
+    
     return () => clearInterval(interval);
   }, []);
+
+  // Cycle through photos when showing comfort
+  useEffect(() => {
+    if (showComfort && comfortPhotos.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentPhotoIndex(prev => (prev + 1) % comfortPhotos.length);
+      }, 5000); // Change photo every 5 seconds
+      return () => clearInterval(interval);
+    }
+  }, [showComfort, comfortPhotos.length]);
 
   const isSessionActive = () => {
     if (typeof window === 'undefined') return false;
@@ -141,18 +165,24 @@ export default function PatientComfort() {
         }
       } else if (data.type === 'transcription') {
         setStatusMessage('You said: "' + data.text + '"');
-        setFailCount(0); // Reset fail count on successful transcription
+        setFailCount(0);
       } else if (data.type === 'response_text') {
-        // Check if this is a "didn't catch" response
         if (data.text.includes("didn't catch")) {
           setFailCount(prev => prev + 1);
         }
         setStatusMessage(data.text);
+      } else if (data.type === 'show_comfort') {
+        // Show comfort photos
+        if (comfortPhotos.length > 0) {
+          setShowComfort(true);
+          setCurrentPhotoIndex(0);
+          // Hide after 30 seconds
+          setTimeout(() => setShowComfort(false), 30000);
+        }
       } else if (data.type === 'response_audio') {
         setIsProcessing(false);
         await playAudio(data.audio);
         
-        // Only auto-restart if session active AND not too many fails
         if (isSessionActive() && failCount < 2) {
           setTimeout(() => startListening(), 1000);
         } else if (failCount >= 2) {
@@ -180,7 +210,7 @@ export default function PatientComfort() {
     };
 
     return () => ws.close();
-  }, [mounted, failCount]);
+  }, [mounted, failCount, comfortPhotos.length]);
 
   const stopListening = () => {
     if (mediaRecorderRef.current?.state === 'recording') {
@@ -190,7 +220,12 @@ export default function PatientComfort() {
   };
 
   const handleScreenTap = () => {
-    // Reset fail count on manual tap
+    // Dismiss comfort photos on tap
+    if (showComfort) {
+      setShowComfort(false);
+      return;
+    }
+    
     setFailCount(0);
     if (isListening) stopListening();
     else if (!isPlaying && !isProcessing) startListening();
@@ -218,8 +253,52 @@ export default function PatientComfort() {
           background: 'linear-gradient(135deg, ' + circadianColors.bg1 + ' 0%, ' + circadianColors.bg2 + ' 100%)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           padding: '40px', cursor: 'pointer', transition: 'background 2s ease',
+          position: 'relative',
         }}
       >
+        {/* Comfort photo overlay */}
+        {showComfort && comfortPhotos.length > 0 && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 5,
+          }}>
+            <div style={{
+              maxWidth: '80%',
+              maxHeight: '80%',
+              borderRadius: '20px',
+              overflow: 'hidden',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            }}>
+              <img 
+                src={comfortPhotos[currentPhotoIndex]} 
+                alt="Memory"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '70vh',
+                  objectFit: 'contain',
+                }}
+              />
+            </div>
+            <p style={{
+              position: 'absolute',
+              bottom: '40px',
+              color: '#fff',
+              fontSize: '1.2rem',
+              opacity: 0.8,
+            }}>
+              Tap anywhere to close
+            </p>
+          </div>
+        )}
+
         <div style={{ marginBottom: '40px' }}>
           <img src="/puppy.png" alt="Comfort companion" style={{ width: '200px', height: '200px', objectFit: 'contain' }} />
         </div>
