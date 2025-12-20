@@ -12,14 +12,16 @@ export default function PatientComfort() {
   const [mounted, setMounted] = useState(false);
   const [failCount, setFailCount] = useState(0);
   const [comfortPhotos, setComfortPhotos] = useState<string[]>([]);
-  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [killSwitchActive, setKillSwitchActive] = useState(false);
-  const [screenDimmed, setScreenDimmed] = useState(false);
   
-  // Memory Anchor Photo State (Dr. Elahi Protocol)
+  // Tier-based intervention state
+  const [currentTier, setCurrentTier] = useState(1);
   const [showMemoryAnchor, setShowMemoryAnchor] = useState(false);
   const [memoryAnchorOpacity, setMemoryAnchorOpacity] = useState(0);
   const [memoryAnchorPhoto, setMemoryAnchorPhoto] = useState<string | null>(null);
+  const [showBreathPacer, setShowBreathPacer] = useState(false);
+  const [breathPacerScale, setBreathPacerScale] = useState(1);
+  const [breathCycleRate, setBreathCycleRate] = useState(20); // cycles per minute
   
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -28,6 +30,8 @@ export default function PatientComfort() {
   const comfortAudioRef = useRef<HTMLAudioElement | null>(null);
   const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
   const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const breathIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const breathDecelerationRef = useRef<NodeJS.Timeout | null>(null);
 
   const saveToLog = (speaker: 'patient' | 'companion' | 'system', text: string) => {
     try {
@@ -37,21 +41,23 @@ export default function PatientComfort() {
     } catch (e) { console.error('Log error:', e); }
   };
 
+  // Circadian color system with smooth transitions
   const getCircadianColors = () => {
-    const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    const totalMinutes = hours * 60 + minutes;
-
-    if (totalMinutes >= 300 && totalMinutes < 420) {
-      return { bg1: '#FFF5E6', bg2: '#FFE4CC', text: '#4A3D32' };
-    }
-    if (totalMinutes >= 420 && totalMinutes < 1020) {
+    const hours = new Date().getHours();
+    
+    if (hours >= 6 && hours < 12) {
+      // Morning: Cool, bright (>5000K)
       return { bg1: '#F0F7FF', bg2: '#E1EFFE', text: '#2C3E50' };
     }
-    if (totalMinutes >= 1020 && totalMinutes < 1260) {
-      return { bg1: '#3D2914', bg2: '#2C1810', text: '#E8DDD4' };
+    if (hours >= 12 && hours < 16) {
+      // Afternoon: Neutral daylight (4000-5000K)
+      return { bg1: '#FFFEF5', bg2: '#FFF9E6', text: '#3D3D3D' };
     }
+    if (hours >= 16 && hours < 20) {
+      // Evening/Sundowning: Warm amber (<3000K)
+      return { bg1: '#FFF5E6', bg2: '#FFE4CC', text: '#4A3D32' };
+    }
+    // Night: Very warm, dim (<2500K)
     return { bg1: '#2C1810', bg2: '#1A0F0A', text: '#E8DDD4' };
   };
 
@@ -63,14 +69,10 @@ export default function PatientComfort() {
     textMuted: '#8B7355',
   };
 
-  const isSundowningWindow = () => {
-    const hours = new Date().getHours();
-    return hours >= 16 && hours < 20;
-  };
-
   useEffect(() => {
     setMounted(true);
     setCircadianColors(getCircadianColors());
+    // Update circadian colors every minute (slow, imperceptible changes)
     const interval = setInterval(() => setCircadianColors(getCircadianColors()), 60000);
     
     try {
@@ -88,34 +90,34 @@ export default function PatientComfort() {
     return localStorage.getItem('everloved-session-active') === 'true';
   };
 
-  // Get the starred/primary photo, or first available
   const getPrimaryPhoto = () => {
     if (comfortPhotos.length === 0) return null;
     const starredIndex = parseInt(localStorage.getItem('everloved-starred-photo') || '0');
     return comfortPhotos[starredIndex] || comfortPhotos[0];
   };
 
-  // Memory Anchor: Slow fade-in over 4 seconds (Dr. Elahi Protocol)
-  const showMemoryAnchorPhoto = (withAudio: boolean = false) => {
+  // TIER 2: Memory Anchor with slow fade-in (3-5 seconds)
+  const showTier2MemoryAnchor = (withMusic: boolean = false) => {
     const photo = getPrimaryPhoto();
     if (!photo) return;
+    
+    // Stop any Tier 3 interventions
+    stopBreathPacer();
     
     setMemoryAnchorPhoto(photo);
     setShowMemoryAnchor(true);
     setMemoryAnchorOpacity(0);
     
-    // Clear any existing fade
     if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
     
-    // Smooth fade-in over 4 seconds (ease-in-out approximation)
+    // Smooth fade-in over 4 seconds
     let progress = 0;
-    const duration = 4000; // 4 seconds
-    const steps = 60; // 60 steps for smooth animation
+    const duration = 4000;
+    const steps = 60;
     const stepDuration = duration / steps;
     
     fadeIntervalRef.current = setInterval(() => {
       progress += 1 / steps;
-      // Ease-in-out curve: 3t^2 - 2t^3
       const eased = progress * progress * (3 - 2 * progress);
       setMemoryAnchorOpacity(eased);
       
@@ -125,23 +127,19 @@ export default function PatientComfort() {
       }
     }, stepDuration);
     
-    // Multi-modal sync hook: Start 528Hz-anchored audio if requested
-    if (withAudio) {
-      startBackgroundMusic();
+    // Start Iso-Principle music if requested
+    if (withMusic) {
+      startIsoMusicIntervention();
     }
     
-    saveToLog('system', 'Memory anchor photo displayed (fade-in)');
+    saveToLog('system', 'Tier 2: Memory anchor displayed');
     
-    // Auto-dismiss after 45 seconds with fade-out
-    setTimeout(() => {
-      hideMemoryAnchorPhoto();
-    }, 45000);
+    setTimeout(() => hideTier2MemoryAnchor(), 60000);
   };
 
-  const hideMemoryAnchorPhoto = () => {
+  const hideTier2MemoryAnchor = () => {
     if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
     
-    // Fade out over 2 seconds
     let progress = 1;
     const duration = 2000;
     const steps = 30;
@@ -160,8 +158,8 @@ export default function PatientComfort() {
     }, stepDuration);
   };
 
-  // Play background comfort music (528Hz-anchored audio from peak memory era)
-  const startBackgroundMusic = () => {
+  // Iso-Principle Music: Start at matched tempo, slowly decelerate
+  const startIsoMusicIntervention = () => {
     try {
       const musicData = localStorage.getItem('everloved-music');
       const musicArray = musicData ? JSON.parse(musicData) : [];
@@ -169,42 +167,146 @@ export default function PatientComfort() {
       
       if (uploadedMusic) {
         backgroundMusicRef.current = new Audio(uploadedMusic);
-        backgroundMusicRef.current.loop = false; // Play full track once
-        backgroundMusicRef.current.volume = 0.25;
+        backgroundMusicRef.current.loop = false;
+        backgroundMusicRef.current.volume = 0.3;
+        backgroundMusicRef.current.playbackRate = 1.0; // Start at normal rate
         backgroundMusicRef.current.play().catch(console.error);
+        
+        // Slowly decrease playback rate over 60 seconds (Iso-Principle)
+        let rate = 1.0;
+        const rateInterval = setInterval(() => {
+          rate = Math.max(0.85, rate - 0.005);
+          if (backgroundMusicRef.current) {
+            backgroundMusicRef.current.playbackRate = rate;
+          }
+          if (rate <= 0.85) clearInterval(rateInterval);
+        }, 2000);
       }
     } catch (e) {
-      console.error('Error playing background music:', e);
+      console.error('Error playing music:', e);
     }
   };
 
-  const stopBackgroundMusic = () => {
+  // TIER 3: Abstract Breath Pacer (no photos/memories)
+  const startBreathPacer = () => {
+    // CRITICAL: Stop all memory-based interventions
+    setShowMemoryAnchor(false);
+    setMemoryAnchorPhoto(null);
     if (backgroundMusicRef.current) {
       backgroundMusicRef.current.pause();
       backgroundMusicRef.current = null;
     }
+    
+    setShowBreathPacer(true);
+    setBreathCycleRate(22); // Start at agitated rate (~22 cycles/min)
+    
+    saveToLog('system', 'Tier 3: Breath pacer activated');
+    
+    // Start breath animation
+    let expanding = true;
+    breathIntervalRef.current = setInterval(() => {
+      setBreathPacerScale(prev => {
+        if (expanding) {
+          if (prev >= 1.3) { expanding = false; return 1.3; }
+          return prev + 0.02;
+        } else {
+          if (prev <= 0.8) { expanding = true; return 0.8; }
+          return prev - 0.02;
+        }
+      });
+    }, 60000 / breathCycleRate / 30); // Adjust interval based on cycle rate
+    
+    // Decelerate breath rate over 2 minutes (22 -> 6 cycles/min)
+    breathDecelerationRef.current = setInterval(() => {
+      setBreathCycleRate(prev => {
+        const newRate = Math.max(6, prev - 0.5);
+        // Update animation speed
+        if (breathIntervalRef.current) {
+          clearInterval(breathIntervalRef.current);
+          let exp = true;
+          breathIntervalRef.current = setInterval(() => {
+            setBreathPacerScale(p => {
+              if (exp) {
+                if (p >= 1.3) { exp = false; return 1.3; }
+                return p + 0.02;
+              } else {
+                if (p <= 0.8) { exp = true; return 0.8; }
+                return p - 0.02;
+              }
+            });
+          }, 60000 / newRate / 30);
+        }
+        return newRate;
+      });
+    }, 5000); // Adjust every 5 seconds
+    
+    // Start rhythmic audio (simple tone pulsing)
+    startRhythmicAudio();
+    
+    // Auto-dismiss after 3 minutes
+    setTimeout(() => stopBreathPacer(), 180000);
   };
 
-  // Handle comfort interventions based on severity (Dr. Elahi Protocol)
-  const handleComfortIntervention = (severity: number, state: string) => {
-    console.log('Comfort intervention:', severity, state);
-    saveToLog('system', `Comfort level ${severity}: ${state}`);
+  const stopBreathPacer = () => {
+    setShowBreathPacer(false);
+    if (breathIntervalRef.current) clearInterval(breathIntervalRef.current);
+    if (breathDecelerationRef.current) clearInterval(breathDecelerationRef.current);
+    stopRhythmicAudio();
+  };
+
+  // Rhythmic audio for Tier 3 (simple, non-melodic)
+  const startRhythmicAudio = () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.frequency.value = 60; // Low, deep tone
+      oscillator.type = 'sine';
+      gainNode.gain.value = 0;
+      
+      oscillator.start();
+      
+      // Pulse the gain to create rhythmic "heartbeat" effect
+      let pulseInterval = setInterval(() => {
+        gainNode.gain.setValueAtTime(0.08, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      }, 60000 / breathCycleRate / 2);
+      
+      (window as any).tier3Oscillator = oscillator;
+      (window as any).tier3AudioContext = audioContext;
+      (window as any).tier3PulseInterval = pulseInterval;
+    } catch (e) {
+      console.error('Error starting rhythmic audio:', e);
+    }
+  };
+
+  const stopRhythmicAudio = () => {
+    if ((window as any).tier3Oscillator) {
+      (window as any).tier3Oscillator.stop();
+      (window as any).tier3AudioContext.close();
+      clearInterval((window as any).tier3PulseInterval);
+    }
+  };
+
+  // Handle tier-based interventions
+  const handleIntervention = (tier: number, stressIndex: number, state: string, sundowning: boolean) => {
+    console.log('Intervention:', { tier, stressIndex, state, sundowning });
+    setCurrentTier(tier);
     
-    const sundowning = isSundowningWindow();
-    
-    if (severity === 1 || (sundowning && severity >= 1)) {
-      // Mild distress OR sundowning: Memory Anchor photo (no overlay, side placement)
-      showMemoryAnchorPhoto(false);
-    } else if (severity === 2) {
-      // Moderate: Memory Anchor photo + background music (multi-modal)
-      showMemoryAnchorPhoto(true);
-    } else if (severity >= 3) {
-      // Severe: Music only, dim screen (reduce visual stimulation)
-      setScreenDimmed(true);
-      startBackgroundMusic();
-      setTimeout(() => {
-        setScreenDimmed(false);
-      }, 45000);
+    if (tier === 1) {
+      // TIER 1: Ambient only - NO active interventions
+      // Circadian lighting is handled automatically
+      // Do nothing - maintain calm
+      saveToLog('system', `Tier 1: Ambient mode (${state})`);
+    } else if (tier === 2) {
+      // TIER 2: Memory anchor + Iso-Principle music
+      showTier2MemoryAnchor(stressIndex > 0.5);
+    } else if (tier === 3) {
+      // TIER 3: Breath pacer - STOP all memory content
+      startBreathPacer();
     }
   };
 
@@ -214,9 +316,8 @@ export default function PatientComfort() {
     setIsProcessing(false);
     setStatusMessage('');
     setShowMemoryAnchor(false);
-    // let music finish
+    stopBreathPacer();
     
-    // Play 528Hz calming tone or uploaded music
     try {
       const musicData = localStorage.getItem('everloved-music');
       const musicArray = musicData ? JSON.parse(musicData) : [];
@@ -249,7 +350,7 @@ export default function PatientComfort() {
 
   const resetKillSwitch = () => {
     setKillSwitchActive(false);
-    setScreenDimmed(false);
+    setCurrentTier(1);
     
     if (comfortAudioRef.current) {
       comfortAudioRef.current.pause();
@@ -356,8 +457,8 @@ export default function PatientComfort() {
         activateKillSwitch();
         localStorage.setItem('everloved-kill-switch', 'true');
         saveToLog('system', 'Kill switch activated: ' + data.reason);
-      } else if (data.type === 'comfort_intervention') {
-        handleComfortIntervention(data.severity, data.state);
+      } else if (data.type === 'intervention') {
+        handleIntervention(data.tier, data.stressIndex, data.state, data.sundowning);
       } else if (data.type === 'transcription') {
         setStatusMessage('You said: "' + data.text + '"');
         saveToLog('patient', data.text);
@@ -402,8 +503,9 @@ export default function PatientComfort() {
 
     return () => {
       ws.close();
-      // let music finish
       if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+      if (breathIntervalRef.current) clearInterval(breathIntervalRef.current);
+      if (breathDecelerationRef.current) clearInterval(breathDecelerationRef.current);
     };
   }, [mounted, failCount, killSwitchActive]);
 
@@ -415,14 +517,13 @@ export default function PatientComfort() {
   };
 
   const handleScreenTap = () => {
-    // Dismiss memory anchor on tap
     if (showMemoryAnchor) {
-      hideMemoryAnchorPhoto();
+      hideTier2MemoryAnchor();
       return;
     }
     
-    if (screenDimmed) {
-      setScreenDimmed(false);
+    if (showBreathPacer) {
+      // Don't dismiss breath pacer with tap - it's therapeutic
       return;
     }
     
@@ -518,92 +619,48 @@ export default function PatientComfort() {
         onClick={handleScreenTap}
         style={{
           flex: 1,
-          background: screenDimmed 
-            ? 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
-            : 'linear-gradient(135deg, ' + circadianColors.bg1 + ' 0%, ' + circadianColors.bg2 + ' 100%)',
+          background: 'linear-gradient(135deg, ' + circadianColors.bg1 + ' 0%, ' + circadianColors.bg2 + ' 100%)',
           display: 'flex', 
-          flexDirection: 'row', // Changed to row for side-by-side layout
+          flexDirection: 'row',
           alignItems: 'center', 
           justifyContent: 'center',
           padding: '40px', 
           cursor: 'pointer', 
-          transition: 'background 2s ease',
+          transition: 'background 15s ease', // Slow circadian transition
           position: 'relative',
           gap: '40px',
         }}
       >
-        {/* Severe distress: dimmed screen with music indicator */}
-        {screenDimmed && (
+        {/* TIER 3: Breath Pacer (abstract, no photos) */}
+        {showBreathPacer && (
           <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            zIndex: 5,
+            position: 'absolute',
+            right: '10%',
+            width: '200px',
+            height: '200px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}>
             <div style={{
-              width: '150px', height: '150px', borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(100,149,237,0.4) 0%, rgba(100,149,237,0.1) 70%)',
-              animation: 'pulse 4s ease-in-out infinite',
-              marginBottom: '40px',
+              width: '150px',
+              height: '150px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(100,180,200,0.5) 0%, rgba(80,150,180,0.2) 70%)',
+              transform: `scale(${breathPacerScale})`,
+              transition: 'transform 0.1s ease-out',
+              boxShadow: '0 0 60px rgba(100,180,200,0.3)',
             }} />
-            <p style={{ color: '#a0c4ff', fontSize: '1.2rem', opacity: 0.8 }}>
-              🎵 Calming music playing...
-            </p>
-            <p style={{ color: '#a0c4ff', fontSize: '0.9rem', opacity: 0.5, marginTop: '20px' }}>
-              Tap anywhere to dismiss
-            </p>
           </div>
         )}
 
-        {/* Main content area - puppy and status */}
-        {!screenDimmed && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '0 0 auto' }}>
-            <div style={{ marginBottom: '40px' }}>
-              <img src="/puppy.png" alt="Comfort companion" style={{ width: '200px', height: '200px', objectFit: 'contain' }} />
-            </div>
-
-            <div style={{
-              width: '20px', height: '20px', borderRadius: '50%',
-              background: isConnected ? (isListening ? '#E74C3C' : isPlaying ? '#3498DB' : isProcessing ? '#F39C12' : '#7A9B6D') : '#999',
-              marginBottom: '20px',
-            }} />
-
-            {statusMessage && (
-              <p style={{
-                color: circadianColors.text, fontSize: '1.8rem', textAlign: 'center',
-                maxWidth: '500px', lineHeight: 1.6, fontWeight: 300,
-              }}>
-                {statusMessage}
-              </p>
-            )}
-
-            {isListening && (
-              <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
-                🎙️ Listening...
-              </p>
-            )}
-
-            {isPlaying && (
-              <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
-                🔊 Speaking...
-              </p>
-            )}
-
-            {isProcessing && !isPlaying && (
-              <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
-                💭 Thinking...
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Memory Anchor Photo - Side placement (Dr. Elahi Protocol) */}
-        {showMemoryAnchor && memoryAnchorPhoto && !screenDimmed && (
+        {/* TIER 2: Memory Anchor Photo (side placement) */}
+        {showMemoryAnchor && memoryAnchorPhoto && !showBreathPacer && (
           <div style={{
             flex: '0 0 auto',
-            width: '35vw', // 30-40% of screen width
+            width: '35vw',
             maxWidth: '400px',
             opacity: memoryAnchorOpacity,
-            transition: 'none', // We handle animation manually for precise control
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -637,6 +694,52 @@ export default function PatientComfort() {
             </p>
           </div>
         )}
+
+        {/* Main content area */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '0 0 auto' }}>
+          <div style={{ marginBottom: '40px' }}>
+            <img src="/puppy.png" alt="Comfort companion" style={{ width: '200px', height: '200px', objectFit: 'contain' }} />
+          </div>
+
+          <div style={{
+            width: '20px', height: '20px', borderRadius: '50%',
+            background: isConnected ? (isListening ? '#E74C3C' : isPlaying ? '#3498DB' : isProcessing ? '#F39C12' : '#7A9B6D') : '#999',
+            marginBottom: '20px',
+          }} />
+
+          {statusMessage && (
+            <p style={{
+              color: circadianColors.text, fontSize: '1.8rem', textAlign: 'center',
+              maxWidth: '500px', lineHeight: 1.6, fontWeight: 300,
+            }}>
+              {statusMessage}
+            </p>
+          )}
+
+          {isListening && (
+            <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
+              🎙️ Listening...
+            </p>
+          )}
+
+          {isPlaying && (
+            <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
+              🔊 Speaking...
+            </p>
+          )}
+
+          {isProcessing && !isPlaying && (
+            <p style={{ color: circadianColors.text, opacity: 0.7, marginTop: '20px', fontSize: '1.2rem' }}>
+              💭 Thinking...
+            </p>
+          )}
+          
+          {showBreathPacer && (
+            <p style={{ color: circadianColors.text, opacity: 0.6, marginTop: '20px', fontSize: '1rem' }}>
+              Breathe with the light...
+            </p>
+          )}
+        </div>
       </div>
 
       <style jsx>{`
