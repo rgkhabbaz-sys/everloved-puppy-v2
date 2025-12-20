@@ -14,11 +14,13 @@ export default function PatientComfort() {
   const [showComfort, setShowComfort] = useState(false);
   const [comfortPhotos, setComfortPhotos] = useState<string[]>([]);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [killSwitchActive, setKillSwitchActive] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const hasAutoStarted = useRef(false);
+  const comfortAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const getCircadianColors = () => {
     const now = new Date();
@@ -51,12 +53,9 @@ export default function PatientComfort() {
     setCircadianColors(getCircadianColors());
     const interval = setInterval(() => setCircadianColors(getCircadianColors()), 60000);
     
-    // Load comfort photos from localStorage
     try {
       const photos = localStorage.getItem('everloved-memory-photos');
-      if (photos) {
-        setComfortPhotos(JSON.parse(photos));
-      }
+      if (photos) setComfortPhotos(JSON.parse(photos));
     } catch (e) {
       console.error('Error loading comfort photos:', e);
     }
@@ -64,12 +63,11 @@ export default function PatientComfort() {
     return () => clearInterval(interval);
   }, []);
 
-  // Cycle through photos when showing comfort
   useEffect(() => {
     if (showComfort && comfortPhotos.length > 1) {
       const interval = setInterval(() => {
         setCurrentPhotoIndex(prev => (prev + 1) % comfortPhotos.length);
-      }, 5000); // Change photo every 5 seconds
+      }, 5000);
       return () => clearInterval(interval);
     }
   }, [showComfort, comfortPhotos.length]);
@@ -77,6 +75,74 @@ export default function PatientComfort() {
   const isSessionActive = () => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('everloved-session-active') === 'true';
+  };
+
+  const activateKillSwitch = () => {
+    setKillSwitchActive(true);
+    setIsListening(false);
+    setIsProcessing(false);
+    setStatusMessage('');
+    
+    // Play comfort music (using a royalty-free calming loop)
+    // In production, this would be caregiver-uploaded music
+    if (comfortAudioRef.current) {
+      comfortAudioRef.current.pause();
+    }
+    
+    // Try to play uploaded comfort music, or use built-in
+    try {
+      const uploadedMusic = localStorage.getItem('everloved-comfort-music');
+      if (uploadedMusic) {
+        comfortAudioRef.current = new Audio(uploadedMusic);
+      } else {
+        // Fallback: generate a simple calming tone
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 528; // 528Hz - "healing frequency"
+        oscillator.type = 'sine';
+        gainNode.gain.value = 0.1;
+        
+        oscillator.start();
+        
+        // Store reference to stop later
+        (window as any).killSwitchOscillator = oscillator;
+        (window as any).killSwitchAudioContext = audioContext;
+      }
+      
+      if (comfortAudioRef.current) {
+        comfortAudioRef.current.loop = true;
+        comfortAudioRef.current.volume = 0.3;
+        comfortAudioRef.current.play().catch(console.error);
+      }
+    } catch (e) {
+      console.error('Error playing comfort audio:', e);
+    }
+  };
+
+  const resetKillSwitch = () => {
+    setKillSwitchActive(false);
+    
+    // Stop comfort audio
+    if (comfortAudioRef.current) {
+      comfortAudioRef.current.pause();
+      comfortAudioRef.current = null;
+    }
+    
+    // Stop oscillator if used
+    if ((window as any).killSwitchOscillator) {
+      (window as any).killSwitchOscillator.stop();
+      (window as any).killSwitchAudioContext.close();
+    }
+    
+    // Reset session
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'reset_kill_switch' }));
+    }
   };
 
   const playAudio = (base64Audio: string) => {
@@ -99,6 +165,7 @@ export default function PatientComfort() {
   };
 
   const startListening = async () => {
+    if (killSwitchActive) return;
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     if (isListening || isPlaying || isProcessing) return;
 
@@ -163,6 +230,9 @@ export default function PatientComfort() {
           hasAutoStarted.current = true;
           setTimeout(() => startListening(), 500);
         }
+      } else if (data.type === 'kill_switch') {
+        console.log('🚨 Kill switch activated:', data.reason);
+        activateKillSwitch();
       } else if (data.type === 'transcription') {
         setStatusMessage('You said: "' + data.text + '"');
         setFailCount(0);
@@ -172,11 +242,9 @@ export default function PatientComfort() {
         }
         setStatusMessage(data.text);
       } else if (data.type === 'show_comfort') {
-        // Show comfort photos
         if (comfortPhotos.length > 0) {
           setShowComfort(true);
           setCurrentPhotoIndex(0);
-          // Hide after 30 seconds
           setTimeout(() => setShowComfort(false), 30000);
         }
       } else if (data.type === 'response_audio') {
@@ -205,12 +273,14 @@ export default function PatientComfort() {
 
     ws.onclose = () => {
       setIsConnected(false);
-      setStatusMessage('Reconnecting...');
-      setTimeout(() => window.location.reload(), 3000);
+      if (!killSwitchActive) {
+        setStatusMessage('Reconnecting...');
+        setTimeout(() => window.location.reload(), 3000);
+      }
     };
 
     return () => ws.close();
-  }, [mounted, failCount, comfortPhotos.length]);
+  }, [mounted, failCount, comfortPhotos.length, killSwitchActive]);
 
   const stopListening = () => {
     if (mediaRecorderRef.current?.state === 'recording') {
@@ -220,16 +290,85 @@ export default function PatientComfort() {
   };
 
   const handleScreenTap = () => {
-    // Dismiss comfort photos on tap
     if (showComfort) {
       setShowComfort(false);
       return;
     }
     
+    if (killSwitchActive) return; // Only caregiver can reset
+    
     setFailCount(0);
     if (isListening) stopListening();
     else if (!isPlaying && !isProcessing) startListening();
   };
+
+  // Kill switch UI
+  if (killSwitchActive) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '40px',
+      }}>
+        {/* Pulsing calm orb */}
+        <div style={{
+          width: '200px',
+          height: '200px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(100,149,237,0.6) 0%, rgba(100,149,237,0.1) 70%)',
+          animation: 'pulse 4s ease-in-out infinite',
+          marginBottom: '60px',
+        }} />
+        
+        <p style={{
+          color: '#a0c4ff',
+          fontSize: '1.5rem',
+          textAlign: 'center',
+          maxWidth: '400px',
+          lineHeight: 1.8,
+          fontWeight: 300,
+        }}>
+          Everything is okay.
+          <br />
+          Just relax and breathe.
+        </p>
+
+        {/* Caregiver reset button - small and unobtrusive */}
+        <Link
+          href="/caregiver/monitoring"
+          onClick={(e) => {
+            e.preventDefault();
+            resetKillSwitch();
+          }}
+          style={{
+            position: 'absolute',
+            bottom: '20px',
+            right: '20px',
+            padding: '8px 16px',
+            background: 'rgba(255,255,255,0.1)',
+            color: 'rgba(255,255,255,0.5)',
+            borderRadius: '8px',
+            fontSize: '0.75rem',
+            textDecoration: 'none',
+            border: '1px solid rgba(255,255,255,0.2)',
+          }}
+        >
+          Caregiver Reset
+        </Link>
+
+        <style jsx>{`
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.6; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -259,40 +398,25 @@ export default function PatientComfort() {
         {/* Comfort photo overlay */}
         {showComfort && comfortPhotos.length > 0 && (
           <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(0,0,0,0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 5,
           }}>
             <div style={{
-              maxWidth: '80%',
-              maxHeight: '80%',
-              borderRadius: '20px',
-              overflow: 'hidden',
+              maxWidth: '80%', maxHeight: '80%',
+              borderRadius: '20px', overflow: 'hidden',
               boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
             }}>
               <img 
                 src={comfortPhotos[currentPhotoIndex]} 
                 alt="Memory"
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '70vh',
-                  objectFit: 'contain',
-                }}
+                style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
               />
             </div>
             <p style={{
-              position: 'absolute',
-              bottom: '40px',
-              color: '#fff',
-              fontSize: '1.2rem',
-              opacity: 0.8,
+              position: 'absolute', bottom: '40px',
+              color: '#fff', fontSize: '1.2rem', opacity: 0.8,
             }}>
               Tap anywhere to close
             </p>
