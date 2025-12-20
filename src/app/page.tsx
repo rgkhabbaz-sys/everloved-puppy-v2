@@ -127,7 +127,8 @@ export default function PatientComfort() {
       setIsConnected(true);
       const patientName = localStorage.getItem('everloved-patient-name') || '';
       const caregiverName = localStorage.getItem('everloved-caregiver-name') || '';
-      ws.send(JSON.stringify({ type: 'start_session', patientName, caregiverName }));
+      const lifeStory = localStorage.getItem('everloved-life-story') || '';
+      ws.send(JSON.stringify({ type: 'start_session', patientName, caregiverName, lifeStory }));
     };
 
     ws.onmessage = async (event) => {
