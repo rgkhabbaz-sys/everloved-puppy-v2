@@ -251,7 +251,7 @@ export default function PatientComfort() {
         if (data.text.includes("didn't catch")) {
           setFailCount(prev => prev + 1);
         }
-        setStatusMessage(data.text);
+        setStatusMessage(data.text); saveToLog("companion", data.text);
       } else if (data.type === 'show_comfort') {
         if (comfortPhotos.length > 0) {
           setShowComfort(true);
