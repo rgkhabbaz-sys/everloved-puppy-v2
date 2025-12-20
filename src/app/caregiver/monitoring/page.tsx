@@ -18,6 +18,7 @@ export default function MonitoringDashboard() {
   const [killSwitchTriggered, setKillSwitchTriggered] = useState(false);
   
   const conversationEndRef = useRef<HTMLDivElement>(null);
+  const prevConversationLength = useRef(0);
 
   // Load initial state and poll for updates
   useEffect(() => {
@@ -48,7 +49,7 @@ export default function MonitoringDashboard() {
   }, []);
 
   useEffect(() => {
-    conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (conversation.length > prevConversationLength.current) { conversationEndRef.current?.scrollIntoView({ behavior: "smooth" }); } prevConversationLength.current = conversation.length;
   }, [conversation]);
 
   const formatDuration = (seconds: number) => {
