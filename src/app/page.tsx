@@ -91,7 +91,7 @@ export default function PatientComfort() {
   // Play background comfort music
   const startBackgroundMusic = () => {
     try {
-      const uploadedMusic = localStorage.getItem('everloved-comfort-music');
+      const musicData = localStorage.getItem('everloved-music'); const musicArray = musicData ? JSON.parse(musicData) : []; const uploadedMusic = musicArray.length > 0 ? musicArray[0].data : null;
       if (uploadedMusic) {
         backgroundMusicRef.current = new Audio(uploadedMusic);
         backgroundMusicRef.current.loop = true;
@@ -162,7 +162,7 @@ export default function PatientComfort() {
     
     // Play 528Hz calming tone
     try {
-      const uploadedMusic = localStorage.getItem('everloved-comfort-music');
+      const musicData = localStorage.getItem('everloved-music'); const musicArray = musicData ? JSON.parse(musicData) : []; const uploadedMusic = musicArray.length > 0 ? musicArray[0].data : null;
       if (uploadedMusic) {
         comfortAudioRef.current = new Audio(uploadedMusic);
         comfortAudioRef.current.loop = true;
