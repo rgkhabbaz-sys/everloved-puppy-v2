@@ -16,9 +16,18 @@ export default function MonitoringDashboard() {
   const [patientName, setPatientName] = useState('Your loved one');
   const [conversation, setConversation] = useState<ConversationEntry[]>([]);
   const [killSwitchTriggered, setKillSwitchTriggered] = useState(false);
+  const [currentTier, setCurrentTier] = useState(1);
   
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const prevConversationLength = useRef(0);
+
+  // Sentiment Glow - maps tier to color and state
+  const getSentimentGlow = () => {
+    if (killSwitchTriggered) return { color: '#C47A7A', label: 'Crisis Mode', description: 'Kill switch activated', pulse: true, glowSize: 40 };
+    if (currentTier === 3) return { color: '#E67E22', label: 'High Stress', description: 'Breath pacer active', pulse: true, glowSize: 35 };
+    if (currentTier === 2) return { color: '#F4D03F', label: 'Mild Anxiety', description: 'Memory anchor shown', pulse: false, glowSize: 25 };
+    return { color: '#7A9B6D', label: 'Calm', description: 'Baseline state', pulse: false, glowSize: 20 };
+  };
 
   // Load initial state and poll for updates
   useEffect(() => {
@@ -34,7 +43,23 @@ export default function MonitoringDashboard() {
 
       try {
         const log = localStorage.getItem('everloved-conversation-log');
-        if (log) setConversation(JSON.parse(log));
+        if (log) {
+          const parsed = JSON.parse(log);
+          setConversation(parsed);
+          
+          // Detect current tier from system messages
+          const systemMsgs = parsed.filter((m: ConversationEntry) => m.speaker === 'system');
+          if (systemMsgs.length > 0) {
+            const lastSystem = systemMsgs[systemMsgs.length - 1].text;
+            if (lastSystem.includes('Kill switch') || lastSystem.includes('Tier 3')) {
+              setCurrentTier(3);
+            } else if (lastSystem.includes('Tier 2') || lastSystem.includes('Memory anchor')) {
+              setCurrentTier(2);
+            } else if (lastSystem.includes('Tier 1') || lastSystem.includes('Ambient')) {
+              setCurrentTier(1);
+            }
+          }
+        }
       } catch (e) {}
 
       if (active) {
@@ -49,7 +74,10 @@ export default function MonitoringDashboard() {
   }, []);
 
   useEffect(() => {
-    if (conversation.length > prevConversationLength.current) { conversationEndRef.current?.scrollIntoView({ behavior: "smooth" }); } prevConversationLength.current = conversation.length;
+    if (conversation.length > prevConversationLength.current) {
+      conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevConversationLength.current = conversation.length;
   }, [conversation]);
 
   const formatDuration = (seconds: number) => {
@@ -69,6 +97,7 @@ export default function MonitoringDashboard() {
     localStorage.removeItem('everloved-kill-switch');
     setConversation([]);
     setKillSwitchTriggered(false);
+    setCurrentTier(1);
     router.push('/');
   };
 
@@ -77,6 +106,8 @@ export default function MonitoringDashboard() {
     setSessionActive(false);
     setSessionDuration(0);
   };
+
+  const sentimentGlow = getSentimentGlow();
 
   const colors = {
     bg: '#FDF8F3',
@@ -97,9 +128,40 @@ export default function MonitoringDashboard() {
         <h1 style={{ color: colors.text, fontSize: '1.8rem', marginBottom: '8px' }}>
           Monitoring Dashboard
         </h1>
-        <p style={{ color: colors.textMuted, marginBottom: '32px' }}>
+        <p style={{ color: colors.textMuted, marginBottom: '24px' }}>
           Control and monitor {patientName}&apos;s comfort sessions
         </p>
+
+        {/* Sentiment Glow Indicator - Privacy-First Visual */}
+        <div style={{
+          background: colors.card, borderRadius: '20px', padding: '24px',
+          marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          display: 'flex', alignItems: 'center', gap: '24px',
+        }}>
+          <div style={{
+            width: '80px', height: '80px', borderRadius: '50%',
+            background: sentimentGlow.color,
+            boxShadow: `0 0 ${sentimentGlow.glowSize}px ${sentimentGlow.color}`,
+            animation: sentimentGlow.pulse ? 'glowPulse 1.5s ease-in-out infinite' : 'none',
+            flexShrink: 0,
+          }} />
+          <div>
+            <h2 style={{ margin: 0, color: colors.text, fontSize: '1.4rem' }}>
+              {sentimentGlow.label}
+            </h2>
+            <p style={{ margin: '4px 0 0', color: colors.textMuted, fontSize: '0.95rem' }}>
+              {sentimentGlow.description}
+            </p>
+          </div>
+          {sessionActive && (
+            <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+              <p style={{ margin: 0, color: colors.textMuted, fontSize: '0.85rem' }}>Session Duration</p>
+              <p style={{ margin: '4px 0 0', color: colors.text, fontSize: '1.5rem', fontWeight: 600 }}>
+                {formatDuration(sessionDuration)}
+              </p>
+            </div>
+          )}
+        </div>
 
         {killSwitchTriggered && (
           <div style={{
@@ -117,6 +179,7 @@ export default function MonitoringDashboard() {
               onClick={() => {
                 localStorage.removeItem('everloved-kill-switch');
                 setKillSwitchTriggered(false);
+                setCurrentTier(1);
               }}
               style={{
                 background: '#fff', color: colors.danger, border: 'none',
@@ -159,7 +222,6 @@ export default function MonitoringDashboard() {
                     background: colors.success, animation: 'pulse 2s infinite',
                   }} />
                   <span style={{ color: colors.success, fontWeight: 600 }}>Active</span>
-                  <span style={{ color: colors.textMuted }}>{formatDuration(sessionDuration)}</span>
                 </div>
                 <button onClick={() => router.push('/')} style={{
                   background: colors.accent, color: '#fff', border: 'none',
@@ -219,9 +281,9 @@ export default function MonitoringDashboard() {
             </p>
           </div>
           <div style={{ background: colors.card, borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
-            <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '8px' }}>Duration</p>
-            <p style={{ color: colors.text, fontSize: '2rem', fontWeight: 600 }}>
-              {sessionActive ? formatDuration(sessionDuration) : '--:--'}
+            <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '8px' }}>Current Tier</p>
+            <p style={{ color: sentimentGlow.color, fontSize: '2rem', fontWeight: 600 }}>
+              {killSwitchTriggered ? 'KILL' : `Tier ${currentTier}`}
             </p>
           </div>
           <div style={{ background: colors.card, borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
@@ -234,6 +296,10 @@ export default function MonitoringDashboard() {
 
         <style jsx global>{`
           @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+          @keyframes glowPulse { 
+            0%, 100% { transform: scale(1); box-shadow: 0 0 30px currentColor; } 
+            50% { transform: scale(1.05); box-shadow: 0 0 50px currentColor; } 
+          }
         `}</style>
       </div>
     </div>
