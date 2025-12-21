@@ -30,7 +30,7 @@ export default function MonitoringDashboard() {
   };
 
   // Load initial state and poll for updates
-  useEffect(() => {
+  useEffect(() => { window.scrollTo(0, 0); }, []); useEffect(() => {
     const saved = localStorage.getItem('everloved-patient-name');
     if (saved) setPatientName(saved);
 
@@ -73,7 +73,7 @@ export default function MonitoringDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
+  useEffect(() => { window.scrollTo(0, 0); }, []); useEffect(() => {
     if (conversation.length > prevConversationLength.current) {
       conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
