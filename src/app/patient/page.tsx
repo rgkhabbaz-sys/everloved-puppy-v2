@@ -399,6 +399,10 @@ export default function PatientComfort() {
     if (audioQueueRef.current.length === 0) {
       isPlayingQueueRef.current = false;
       setIsPlaying(false);
+      // Restart listening after audio finishes
+      if (isSessionActive() && failCount < 2) {
+        setTimeout(() => startListening(), 1000);
+      }
       return;
     }
     
