@@ -474,10 +474,13 @@ export default function PatientComfort() {
 
     ws.onopen = () => {
       setIsConnected(true);
-      const patientName = localStorage.getItem('everloved-patient-name') || '';
-      const caregiverName = localStorage.getItem('everloved-caregiver-name') || '';
-      const lifeStory = localStorage.getItem('everloved-life-story') || '';
-      ws.send(JSON.stringify({ type: 'start_session', patientName, caregiverName, lifeStory }));
+      // Only start session if caregiver clicked "Start Interaction"
+      if (localStorage.getItem('everloved-session-active') === 'true') {
+        const patientName = localStorage.getItem('everloved-patient-name') || '';
+        const caregiverName = localStorage.getItem('everloved-caregiver-name') || '';
+        const lifeStory = localStorage.getItem('everloved-life-story') || '';
+        ws.send(JSON.stringify({ type: 'start_session', patientName, caregiverName, lifeStory }));
+      }
     };
 
     ws.onmessage = async (event) => {
