@@ -433,7 +433,7 @@ export default function PatientComfort() {
   useEffect(() => {
     if (!mounted) return;
     
-    const ws = new WebSocket('wss://everloved-backend-production.up.railway.app');
+    const ws = new WebSocket('wss://ease-backend-production.up.railway.app');
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -468,7 +468,7 @@ export default function PatientComfort() {
           setFailCount(prev => prev + 1);
         }
         setStatusMessage(data.text);
-        saveToLog('companion', data.text);
+        saveToLog('companion', data.text); if (data.audio) { await playAudio(data.audio); }
       } else if (data.type === 'response_audio') {
         setIsProcessing(false);
         await playAudio(data.audio);
