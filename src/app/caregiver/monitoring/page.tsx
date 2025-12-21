@@ -100,7 +100,7 @@ export default function MonitoringDashboard() {
     setConversation([]);
     setKillSwitchTriggered(false);
     setCurrentTier(1);
-    router.push('/');
+    router.push('/patient');
   };
 
   const handleEndInteraction = () => {
@@ -225,7 +225,7 @@ export default function MonitoringDashboard() {
                   }} />
                   <span style={{ color: colors.success, fontWeight: 600 }}>Active</span>
                 </div>
-                <button onClick={() => router.push('/')} style={{
+                <button onClick={() => router.push('/patient')} style={{
                   background: colors.accent, color: '#fff', border: 'none',
                   padding: '12px 24px', borderRadius: '10px', fontSize: '1rem',
                   fontWeight: 500, cursor: 'pointer',
