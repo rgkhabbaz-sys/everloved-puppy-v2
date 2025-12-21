@@ -14,7 +14,7 @@ export default function CaregiverLayout({ children }: { children: React.ReactNod
   };
 
   const mainTabs = [
-    { href: '/', label: 'Patient Comfort', icon: '♡' },
+    { href: '/patient', label: 'Patient Comfort', icon: '♡' },
     { href: '/caregiver', label: 'Caregiver Control', icon: '⚙' },
     { href: '/science', label: 'New Science', icon: '◈' },
   ];

@@ -21,6 +21,8 @@ export default function MonitoringDashboard() {
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const prevConversationLength = useRef(0);
 
+  useEffect(() => { setTimeout(() => window.scrollTo(0, 0), 100); }, []);
+
   // Sentiment Glow - maps tier to color and state
   const getSentimentGlow = () => {
     if (killSwitchTriggered) return { color: '#C47A7A', label: 'Crisis Mode', description: 'Kill switch activated', pulse: true, glowSize: 40 };
@@ -30,7 +32,7 @@ export default function MonitoringDashboard() {
   };
 
   // Load initial state and poll for updates
-  useEffect(() => { window.scrollTo(0, 0); }, []); useEffect(() => {
+  useEffect(() => {
     const saved = localStorage.getItem('everloved-patient-name');
     if (saved) setPatientName(saved);
 
@@ -73,7 +75,7 @@ export default function MonitoringDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => { window.scrollTo(0, 0); }, []); useEffect(() => {
+  useEffect(() => {
     if (conversation.length > prevConversationLength.current) {
       conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
