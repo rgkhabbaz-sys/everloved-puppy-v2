@@ -1,6 +1,4 @@
 {
   "/page": "app/page.js",
-  "/caregiver/monitoring/page": "app/caregiver/monitoring/page.js",
-  "/caregiver/analytics/page": "app/caregiver/analytics/page.js",
-  "/caregiver/page": "app/caregiver/page.js"
+  "/caregiver/monitoring/page": "app/caregiver/monitoring/page.js"
 }

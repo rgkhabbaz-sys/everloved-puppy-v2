@@ -20,16 +20,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/caregiver/layout.js"
-    ],
-    "/caregiver/analytics/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/caregiver/analytics/page.js"
-    ],
-    "/caregiver/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/caregiver/page.js"
     ]
   }
 }
