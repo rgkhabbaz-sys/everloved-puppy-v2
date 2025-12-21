@@ -463,6 +463,11 @@ export default function PatientComfort() {
         activateKillSwitch();
         localStorage.setItem('everloved-kill-switch', 'true');
         saveToLog('system', 'Kill switch activated: ' + data.reason);
+      } else if (data.type === 'speech_complete') {
+        if (mediaRecorderRef.current?.state === 'recording') {
+          mediaRecorderRef.current.stop();
+          setIsListening(false);
+        }
       } else if (data.type === 'intervention') {
         handleIntervention(data.tier, data.stressIndex, data.state, data.sundowning);
       } else if (data.type === 'transcription') {
