@@ -395,41 +395,47 @@ export default function PatientComfort() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
       mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+      
+      // Tell backend to start streaming
+      wsRef.current?.send(JSON.stringify({ type: 'start_streaming' }));
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+        if (event.data.size > 0 && wsRef.current?.readyState === WebSocket.OPEN) {
+          // Stream each chunk immediately
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64 = (reader.result as string).split(',')[1];
+            wsRef.current?.send(JSON.stringify({ type: 'audio_chunk', audio: base64 }));
+          };
+          reader.readAsDataURL(event.data);
+        }
       };
 
       mediaRecorder.onstop = () => {
         setIsProcessing(true);
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          wsRef.current?.send(JSON.stringify({ type: 'audio_data', audio: base64 }));
-        };
-        reader.readAsDataURL(audioBlob);
+        // Tell backend streaming is done
+        wsRef.current?.send(JSON.stringify({ type: 'end_streaming' }));
         stream.getTracks().forEach(track => track.stop());
       };
 
-      mediaRecorder.start();
+      // Start with 250ms chunks for real-time streaming
+      mediaRecorder.start(250);
       setIsListening(true);
       setStatusMessage('I\'m listening...');
 
+      // Auto-stop after 8 seconds (slightly longer for streaming)
       setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
           setIsListening(false);
         }
-      }, 5000);
+      }, 8000);
 
     } catch (error) {
       console.error('Microphone error:', error);
       setStatusMessage('Please allow microphone access.');
     }
   };
-
   useEffect(() => {
     if (!mounted) return;
     
