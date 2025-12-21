@@ -26,6 +26,8 @@ export default function PatientComfort() {
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioQueueRef = useRef<string[]>([]);
+  const isPlayingQueueRef = useRef(false);
   const hasAutoStarted = useRef(false);
   const comfortAudioRef = useRef<HTMLAudioElement | null>(null);
   const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
@@ -386,6 +388,30 @@ export default function PatientComfort() {
     });
   };
 
+  const queueAudio = (base64Audio: string) => {
+    audioQueueRef.current.push(base64Audio);
+    if (!isPlayingQueueRef.current) {
+      playNextInQueue();
+    }
+  };
+
+  const playNextInQueue = async () => {
+    if (audioQueueRef.current.length === 0) {
+      isPlayingQueueRef.current = false;
+      setIsPlaying(false);
+      return;
+    }
+    
+    isPlayingQueueRef.current = true;
+    setIsPlaying(true);
+    const nextAudio = audioQueueRef.current.shift()!;
+    
+    const audio = new Audio(`data:audio/mp3;base64,${nextAudio}`);
+    audio.onended = () => playNextInQueue();
+    audio.onerror = () => playNextInQueue();
+    audio.play().catch(() => playNextInQueue());
+  };
+
   const startListening = async () => {
     if (killSwitchActive) return;
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -474,12 +500,24 @@ export default function PatientComfort() {
         setStatusMessage('You said: "' + data.text + '"');
         saveToLog('patient', data.text);
         setFailCount(0);
+      } else if (data.type === 'response_audio_chunk') {
+        // Queue audio chunks for sequential playback
+        if (data.audio) {
+          queueAudio(data.audio);
+        }
+        if (data.chunkIndex === 0) {
+          setStatusMessage(data.text);
+        }
       } else if (data.type === 'response_text') {
         if (data.text.includes("didn't catch")) {
           setFailCount(prev => prev + 1);
         }
         setStatusMessage(data.text);
-        saveToLog('companion', data.text); if (data.audio) { await playAudio(data.audio); }
+        saveToLog('companion', data.text);
+        // Only play audio if no chunks were sent (fallback)
+        if (data.audio && audioQueueRef.current.length === 0 && !isPlayingQueueRef.current) {
+          await playAudio(data.audio);
+        }
       } else if (data.type === 'response_audio') {
         setIsProcessing(false);
         await playAudio(data.audio);
