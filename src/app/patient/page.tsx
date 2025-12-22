@@ -460,10 +460,8 @@ export default function PatientComfort() {
           mediaRecorder.stop();
           setIsListening(false);
         }
+        isStreamingRef.current = false;
       }, 8000);
-
-      // Reset streaming lock when done
-      isStreamingRef.current = false;
 
     } catch (error) {
       isStreamingRef.current = false;
@@ -506,6 +504,7 @@ export default function PatientComfort() {
           mediaRecorderRef.current.stop();
           setIsListening(false);
         }
+        isStreamingRef.current = false;
       } else if (data.type === 'intervention') {
         handleIntervention(data.tier, data.stressIndex, data.state, data.sundowning);
       } else if (data.type === 'transcription') {
