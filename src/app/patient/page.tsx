@@ -455,20 +455,9 @@ export default function PatientComfort() {
       setIsListening(true);
       setStatusMessage('I\'m listening...');
 
-      // Cancel any previous timeout
-      if (streamTimeoutRef.current) {
-        clearTimeout(streamTimeoutRef.current);
-      }
-      
-      // Auto-stop after 10 seconds
-      streamTimeoutRef.current = setTimeout(() => {
-        if (mediaRecorderRef.current?.state === 'recording') {
-          mediaRecorderRef.current.stop();
-          setIsListening(false);
-        }
-        isStreamingRef.current = false;
-        streamTimeoutRef.current = null;
-      }, 10000);
+      // No timeout - let patient take as long as needed
+      // Deepgram will detect when they finish speaking
+      // Conversation ends only via caregiver action or kill switch
 
     } catch (error) {
       isStreamingRef.current = false;
