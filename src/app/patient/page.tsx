@@ -28,6 +28,7 @@ export default function PatientComfort() {
   const audioChunksRef = useRef<Blob[]>([]);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingQueueRef = useRef(false);
+  const isStreamingRef = useRef(false);
   const hasAutoStarted = useRef(false);
   const comfortAudioRef = useRef<HTMLAudioElement | null>(null);
   const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
@@ -461,7 +462,11 @@ export default function PatientComfort() {
         }
       }, 8000);
 
+      // Reset streaming lock when done
+      isStreamingRef.current = false;
+
     } catch (error) {
+      isStreamingRef.current = false;
       console.error('Microphone error:', error);
       setStatusMessage('Please allow microphone access.');
     }
