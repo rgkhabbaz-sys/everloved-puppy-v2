@@ -405,7 +405,7 @@ export default function PatientComfort() {
       setIsPlaying(false);
       // Restart listening after audio finishes
       if (isSessionActive() && failCount < 2) {
-        setTimeout(() => startListening(), 1000);
+        setTimeout(() => startContinuousAudio(), 1000);
       }
       return;
     }
@@ -535,7 +535,7 @@ export default function PatientComfort() {
         setIsProcessing(false);
         setStatusMessage('Let me try again...');
         if (isSessionActive()) {
-          setTimeout(() => startListening(), 1500);
+          setTimeout(() => startContinuousAudio(), 1500);
         }
       }
     };
@@ -578,7 +578,7 @@ export default function PatientComfort() {
     
     setFailCount(0);
     if (isListening) stopListening();
-    else if (!isPlaying && !isProcessing) startListening();
+    else if (!isPlaying && !isProcessing) startContinuousAudio();
   };
 
   // Kill switch UI
