@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { AnimatedPuppy } from '@/components/AnimatedPuppy';
 
 export default function PatientComfort() {
   const [isConnected, setIsConnected] = useState(false);
@@ -16,6 +17,8 @@ export default function PatientComfort() {
   
   // Tier-based intervention state
   const [currentTier, setCurrentTier] = useState(1);
+  const [earPerk, setEarPerk] = useState(false);
+  const [audioAmplitude, setAudioAmplitude] = useState(0);
   const [showMemoryAnchor, setShowMemoryAnchor] = useState(false);
   const [memoryAnchorOpacity, setMemoryAnchorOpacity] = useState(0);
   const [memoryAnchorPhoto, setMemoryAnchorPhoto] = useState<string | null>(null);
@@ -33,6 +36,9 @@ export default function PatientComfort() {
   const isStreamingRef = useRef(false);
   const streamTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasAutoStarted = useRef(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const amplitudeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const comfortAudioRef = useRef<HTMLAudioElement | null>(null);
   const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
   const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -403,6 +409,11 @@ export default function PatientComfort() {
     if (audioQueueRef.current.length === 0) {
       isPlayingQueueRef.current = false;
       setIsPlaying(false);
+      setAudioAmplitude(0);
+      if (amplitudeIntervalRef.current) {
+        clearInterval(amplitudeIntervalRef.current);
+        amplitudeIntervalRef.current = null;
+      }
       // Restart listening after audio finishes
       if (isSessionActive() && failCount < 2) {
         setTimeout(() => startContinuousAudio(), 1000);
@@ -415,9 +426,45 @@ export default function PatientComfort() {
     const nextAudio = audioQueueRef.current.shift()!;
     
     const audio = new Audio(`data:audio/mp3;base64,${nextAudio}`);
-    audio.onended = () => playNextInQueue();
-    audio.onerror = () => playNextInQueue();
-    audio.play().catch(() => playNextInQueue());
+    
+    // Set up audio analysis for mouth sync
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
+      const source = audioContextRef.current.createMediaElementSource(audio);
+      const analyser = audioContextRef.current.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyser.connect(audioContextRef.current.destination);
+      analyserRef.current = analyser;
+      
+      // Track amplitude at 60fps for smooth mouth animation
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      amplitudeIntervalRef.current = setInterval(() => {
+        if (analyserRef.current) {
+          analyserRef.current.getByteFrequencyData(dataArray);
+          const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+          setAudioAmplitude(avg / 255); // Normalize to 0-1
+        }
+      }, 16); // ~60fps
+    } catch (e) {
+      // Fallback if audio analysis fails
+      console.log('Audio analysis not available');
+    }
+    
+    audio.onended = () => {
+      setAudioAmplitude(0);
+      playNextInQueue();
+    };
+    audio.onerror = () => {
+      setAudioAmplitude(0);
+      playNextInQueue();
+    };
+    audio.play().catch(() => {
+      setAudioAmplitude(0);
+      playNextInQueue();
+    });
   };
 
   const startContinuousAudio = async () => {
@@ -502,7 +549,15 @@ export default function PatientComfort() {
         setIsProcessing(true);
       } else if (data.type === 'intervention') {
         handleIntervention(data.tier, data.stressIndex, data.state, data.sundowning);
+      } else if (data.type === 'ear_perk') {
+        // Instant ear perk on speech detection (<50ms response)
+        setEarPerk(true);
+        setTimeout(() => setEarPerk(false), 500);
+      } else if (data.type === 'interim_transcript') {
+        // Keep ears perked while user is speaking
+        setEarPerk(true);
       } else if (data.type === 'transcription') {
+        setEarPerk(false);
         setStatusMessage('You said: "' + data.text + '"');
         saveToLog('patient', data.text);
         setFailCount(0);
@@ -746,7 +801,13 @@ export default function PatientComfort() {
         {/* Main content area */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '0 0 auto' }}>
           <div style={{ marginBottom: '40px' }}>
-            <img src="/puppy.png" alt="Comfort companion" style={{ width: '600px', height: '600px', objectFit: 'contain' }} />
+            <AnimatedPuppy
+              isListening={isListening}
+              isPlaying={isPlaying}
+              earPerk={earPerk}
+              currentTier={currentTier}
+              audioAmplitude={audioAmplitude}
+            />
           </div>
 
           <div style={{
