@@ -607,8 +607,8 @@ export default function PatientComfort() {
         padding: '40px',
       }}>
         <div style={{
-          width: '200px',
-          height: '200px',
+          width: '400px',
+          height: '400px',
           borderRadius: '50%',
           background: 'radial-gradient(circle, rgba(100,149,237,0.6) 0%, rgba(100,149,237,0.1) 70%)',
           animation: 'pulse 4s ease-in-out infinite',
@@ -697,8 +697,8 @@ export default function PatientComfort() {
           <div style={{
             position: 'absolute',
             right: '10%',
-            width: '200px',
-            height: '200px',
+            width: '400px',
+            height: '400px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -759,7 +759,7 @@ export default function PatientComfort() {
         {/* Main content area */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '0 0 auto' }}>
           <div style={{ marginBottom: '40px' }}>
-            <img src="/puppy.png" alt="Comfort companion" style={{ width: '200px', height: '200px', objectFit: 'contain' }} />
+            <img src="/puppy.png" alt="Comfort companion" style={{ width: '400px', height: '400px', objectFit: 'contain' }} />
           </div>
 
           <div style={{
