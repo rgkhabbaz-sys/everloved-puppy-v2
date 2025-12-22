@@ -29,6 +29,7 @@ export default function PatientComfort() {
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingQueueRef = useRef(false);
   const isStreamingRef = useRef(false);
+  const streamTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasAutoStarted = useRef(false);
   const comfortAudioRef = useRef<HTMLAudioElement | null>(null);
   const backgroundMusicRef = useRef<HTMLAudioElement | null>(null);
@@ -454,14 +455,20 @@ export default function PatientComfort() {
       setIsListening(true);
       setStatusMessage('I\'m listening...');
 
-      // Auto-stop after 8 seconds (slightly longer for streaming)
-      setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
-          mediaRecorder.stop();
+      // Cancel any previous timeout
+      if (streamTimeoutRef.current) {
+        clearTimeout(streamTimeoutRef.current);
+      }
+      
+      // Auto-stop after 10 seconds
+      streamTimeoutRef.current = setTimeout(() => {
+        if (mediaRecorderRef.current?.state === 'recording') {
+          mediaRecorderRef.current.stop();
           setIsListening(false);
         }
         isStreamingRef.current = false;
-      }, 8000);
+        streamTimeoutRef.current = null;
+      }, 10000);
 
     } catch (error) {
       isStreamingRef.current = false;
@@ -500,6 +507,10 @@ export default function PatientComfort() {
         localStorage.setItem('everloved-kill-switch', 'true');
         saveToLog('system', 'Kill switch activated: ' + data.reason);
       } else if (data.type === 'speech_complete') {
+        if (streamTimeoutRef.current) {
+          clearTimeout(streamTimeoutRef.current);
+          streamTimeoutRef.current = null;
+        }
         if (mediaRecorderRef.current?.state === 'recording') {
           mediaRecorderRef.current.stop();
           setIsListening(false);
