@@ -448,6 +448,8 @@ export default function PatientComfort() {
         // Tell backend streaming is done
         wsRef.current?.send(JSON.stringify({ type: 'end_streaming' }));
         stream.getTracks().forEach(track => track.stop());
+        // Reset streaming lock so next listening can start
+        isStreamingRef.current = false;
       };
 
       // Start with 250ms chunks for real-time streaming
