@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 interface ConversationEntry {
   timestamp: string;
@@ -17,6 +18,8 @@ export default function MonitoringDashboard() {
   const [conversation, setConversation] = useState<ConversationEntry[]>([]);
   const [killSwitchTriggered, setKillSwitchTriggered] = useState(false);
   const [currentTier, setCurrentTier] = useState(1);
+  const [selectedGame, setSelectedGame] = useState<string | null>(null);
+  const [activeGame, setActiveGame] = useState<string | null>(null);
   
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const prevConversationLength = useRef(0);
@@ -109,6 +112,27 @@ export default function MonitoringDashboard() {
     setSessionDuration(0);
   };
 
+  // Game intervention handlers (UI mockup only - no game logic yet)
+  const handleGameSelect = (gameId: string) => {
+    if (activeGame) return; // Can't change selection while game is running
+    setSelectedGame(selectedGame === gameId ? null : gameId);
+  };
+
+  const handleStartGame = (gameId: string) => {
+    if (activeGame || selectedGame !== gameId) return;
+    console.log(`Starting game: ${gameId}`);
+    setActiveGame(gameId);
+    // Future: Navigate to game or launch game overlay
+  };
+
+  const handleEndGame = (gameId: string) => {
+    if (activeGame !== gameId) return;
+    console.log(`Ending game: ${gameId}`);
+    setActiveGame(null);
+    setSelectedGame(null);
+    // Future: Return to monitoring view, log session data
+  };
+
   const sentimentGlow = getSentimentGlow();
 
   const colors = {
@@ -123,6 +147,43 @@ export default function MonitoringDashboard() {
     companionBubble: '#F0E6D3',
     systemBubble: '#FFE5E5',
   };
+
+  // Clinical Intervention Palette - Game definitions
+  const interventions = [
+    {
+      id: 'golden-thread',
+      game: 'The Golden Thread',
+      stage: 'STAGE 1',
+      subText: 'Ambient Engagement',
+      protocol: 'Routine Anchoring',
+      note: 'Use for active daily interaction to maintain cognitive threads.',
+      color: '#DAA520',
+      borderColor: '#B8860B',
+      image: '/games/golden-thread.png',
+    },
+    {
+      id: 'lifes-ledger',
+      game: "Life's Ledger",
+      stage: 'STAGE 2',
+      subText: 'Memory Anchoring',
+      protocol: 'Reality Validation',
+      note: 'Use to ground the patient when they seem lost or confused.',
+      color: '#A0522D',
+      borderColor: '#8B4513',
+      image: '/games/lifes-ledger.png',
+    },
+    {
+      id: 'calm-current',
+      game: 'The Calm Current',
+      stage: 'STAGE 3',
+      subText: 'Physiological Rescue',
+      protocol: 'De-escalation',
+      note: 'Use for acute agitation or sundowning. Activates Guardian Mode.',
+      color: '#4682B4',
+      borderColor: '#36648B',
+      image: '/games/calm-current.png',
+    },
+  ];
 
   return (
     <div style={{ padding: '32px', background: colors.bg, minHeight: '100vh' }}>
@@ -193,6 +254,7 @@ export default function MonitoringDashboard() {
           </div>
         )}
 
+        {/* Session Control */}
         <div style={{
           background: colors.card, borderRadius: '20px', padding: '32px',
           marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
@@ -237,6 +299,7 @@ export default function MonitoringDashboard() {
           </div>
         </div>
 
+        {/* Conversation Log - NOW BEFORE GAME SECTION */}
         <div style={{
           background: colors.card, borderRadius: '20px', padding: '32px',
           marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
@@ -275,6 +338,217 @@ export default function MonitoringDashboard() {
           </div>
         </div>
 
+        {/* ============================================ */}
+        {/* CLINICAL INTERVENTION PALETTE - GAME SELECTOR */}
+        {/* ============================================ */}
+        <div style={{
+          background: colors.card, borderRadius: '20px', padding: '32px',
+          marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+        }}>
+          <h2 style={{ color: colors.text, fontSize: '1.2rem', marginBottom: '8px' }}>
+            Clinical Intervention Palette
+          </h2>
+          <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '24px' }}>
+            Select a therapeutic game matched to {patientName}&apos;s current cognitive stage
+          </p>
+
+          {/* Game Cards Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '20px',
+            marginBottom: '24px',
+          }}>
+            {interventions.map((intervention) => {
+              const isSelected = selectedGame === intervention.id;
+              const isActive = activeGame === intervention.id;
+              const isDisabled = activeGame !== null && activeGame !== intervention.id;
+
+              return (
+                <button
+                  key={intervention.id}
+                  onClick={() => handleGameSelect(intervention.id)}
+                  disabled={isDisabled}
+                  style={{
+                    background: isActive 
+                      ? `linear-gradient(145deg, ${intervention.color}30, ${intervention.color}20)`
+                      : isSelected 
+                        ? `linear-gradient(145deg, ${intervention.color}25, ${intervention.color}15)`
+                        : `linear-gradient(145deg, ${intervention.color}15, ${intervention.color}08)`,
+                    border: isActive 
+                      ? `3px solid ${intervention.color}`
+                      : isSelected 
+                        ? `3px solid ${intervention.borderColor}`
+                        : `2px solid ${intervention.borderColor}40`,
+                    borderRadius: '16px',
+                    padding: '0',
+                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.2s ease',
+                    overflow: 'hidden',
+                    opacity: isDisabled ? 0.5 : 1,
+                    boxShadow: isActive 
+                      ? `0 0 20px ${intervention.color}50`
+                      : isSelected 
+                        ? `0 4px 16px ${intervention.color}30`
+                        : 'none',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isDisabled && !isActive) {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      if (!isSelected) {
+                        e.currentTarget.style.boxShadow = `0 8px 24px ${intervention.color}30`;
+                        e.currentTarget.style.borderColor = intervention.borderColor;
+                      }
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isDisabled && !isActive) {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      if (!isSelected) {
+                        e.currentTarget.style.boxShadow = 'none';
+                        e.currentTarget.style.borderColor = `${intervention.borderColor}40`;
+                      }
+                    }
+                  }}
+                >
+                  {/* Active Indicator */}
+                  {isActive && (
+                    <div style={{
+                      background: intervention.color,
+                      color: '#fff',
+                      padding: '6px 12px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      letterSpacing: '1px',
+                    }}>
+                      🎮 GAME IN PROGRESS
+                    </div>
+                  )}
+
+                  {/* Game Image */}
+                  <div style={{
+                    width: '100%',
+                    height: '140px',
+                    position: 'relative',
+                    background: intervention.color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Image
+                      src={intervention.image}
+                      alt={intervention.game}
+                      fill
+                      style={{ objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+
+                  {/* Card Content */}
+                  <div style={{ padding: '16px' }}>
+                    {/* Stage Badge */}
+                    <div style={{
+                      display: 'inline-block',
+                      background: intervention.color,
+                      color: '#fff',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.5px',
+                      marginBottom: '8px',
+                    }}>
+                      {intervention.stage}
+                    </div>
+
+                    {/* Game Title */}
+                    <h3 style={{
+                      margin: '0 0 4px 0',
+                      color: colors.text,
+                      fontSize: '1.05rem',
+                      fontWeight: 600,
+                    }}>
+                      {intervention.game}
+                    </h3>
+
+                    {/* Sub-text */}
+                    <p style={{
+                      margin: '0 0 8px 0',
+                      color: intervention.color,
+                      fontSize: '0.85rem',
+                      fontWeight: 500,
+                    }}>
+                      {intervention.subText} • {intervention.protocol}
+                    </p>
+
+                    {/* Caregiver Note */}
+                    <p style={{
+                      margin: 0,
+                      color: colors.textMuted,
+                      fontSize: '0.8rem',
+                      lineHeight: 1.4,
+                    }}>
+                      {intervention.note}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Single Start / End Buttons */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '16px',
+            paddingTop: '16px',
+            borderTop: `1px solid ${colors.textMuted}20`,
+          }}>
+            <button
+              onClick={() => selectedGame && handleStartGame(selectedGame)}
+              disabled={!selectedGame || activeGame !== null}
+              style={{
+                flex: 1,
+                background: selectedGame && !activeGame ? colors.success : '#E0E0E0',
+                color: selectedGame && !activeGame ? '#fff' : '#999',
+                border: 'none',
+                padding: '16px 24px',
+                borderRadius: '12px',
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                cursor: selectedGame && !activeGame ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              ▶️ Start Game
+            </button>
+            <button
+              onClick={() => activeGame && handleEndGame(activeGame)}
+              disabled={!activeGame}
+              style={{
+                flex: 1,
+                background: activeGame ? colors.danger : '#E0E0E0',
+                color: activeGame ? '#fff' : '#999',
+                border: 'none',
+                padding: '16px 24px',
+                borderRadius: '12px',
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                cursor: activeGame ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s ease',
+                animation: activeGame ? 'pulse 2s infinite' : 'none',
+              }}
+            >
+              ⏹️ End Game
+            </button>
+          </div>
+        </div>
+        {/* END CLINICAL INTERVENTION PALETTE */}
+
+        {/* Stats Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
           <div style={{ background: colors.card, borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
             <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '8px' }}>Messages</p>
