@@ -21,6 +21,7 @@ export default function CaregiverLayout({ children }: { children: React.ReactNod
 
   const subTabs = [
     { href: '/caregiver', label: 'Avatar Configuration' },
+    { href: '/caregiver/settings', label: 'Disease Stage' },
     { href: '/caregiver/monitoring', label: 'Monitoring Dashboard' },
     { href: '/caregiver/analytics', label: 'Cognitive Analytics' },
   ];

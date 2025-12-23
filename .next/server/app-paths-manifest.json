@@ -1,10 +1,10 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/page": "app/page.js",
   "/patient/page": "app/patient/page.js",
-  "/caregiver/page": "app/caregiver/page.js",
+  "/page": "app/page.js",
   "/caregiver/settings/page": "app/caregiver/settings/page.js",
   "/caregiver/analytics/page": "app/caregiver/analytics/page.js",
   "/caregiver/monitoring/page": "app/caregiver/monitoring/page.js",
+  "/caregiver/page": "app/caregiver/page.js",
   "/science/page": "app/science/page.js"
 }

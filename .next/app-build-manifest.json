@@ -15,13 +15,6 @@
       "static/css/93a4195364176184.css",
       "static/chunks/app/layout-3277004fc507cddd.js"
     ],
-    "/page": [
-      "static/chunks/webpack-b7eb15e779c34889.js",
-      "static/chunks/fd9d1056-ce36d2dab1fe63d8.js",
-      "static/chunks/23-1ee2247c20c96319.js",
-      "static/chunks/main-app-ebe9bcb4ef779fa1.js",
-      "static/chunks/app/page-ffc06cd4473239c6.js"
-    ],
     "/patient/page": [
       "static/chunks/webpack-b7eb15e779c34889.js",
       "static/chunks/fd9d1056-ce36d2dab1fe63d8.js",
@@ -31,20 +24,12 @@
       "static/chunks/59-f56cbd13ecf5223d.js",
       "static/chunks/app/patient/page-656c378fe8ef31f8.js"
     ],
-    "/caregiver/page": [
+    "/page": [
       "static/chunks/webpack-b7eb15e779c34889.js",
       "static/chunks/fd9d1056-ce36d2dab1fe63d8.js",
       "static/chunks/23-1ee2247c20c96319.js",
       "static/chunks/main-app-ebe9bcb4ef779fa1.js",
-      "static/chunks/app/caregiver/page-e39f063577cb87bd.js"
-    ],
-    "/caregiver/layout": [
-      "static/chunks/webpack-b7eb15e779c34889.js",
-      "static/chunks/fd9d1056-ce36d2dab1fe63d8.js",
-      "static/chunks/23-1ee2247c20c96319.js",
-      "static/chunks/main-app-ebe9bcb4ef779fa1.js",
-      "static/chunks/138-51bfc1dc59fa35b7.js",
-      "static/chunks/app/caregiver/layout-8a3afecc57f60bd0.js"
+      "static/chunks/app/page-ffc06cd4473239c6.js"
     ],
     "/caregiver/settings/page": [
       "static/chunks/webpack-b7eb15e779c34889.js",
@@ -52,6 +37,14 @@
       "static/chunks/23-1ee2247c20c96319.js",
       "static/chunks/main-app-ebe9bcb4ef779fa1.js",
       "static/chunks/app/caregiver/settings/page-6e325c22dbad1fdb.js"
+    ],
+    "/caregiver/layout": [
+      "static/chunks/webpack-b7eb15e779c34889.js",
+      "static/chunks/fd9d1056-ce36d2dab1fe63d8.js",
+      "static/chunks/23-1ee2247c20c96319.js",
+      "static/chunks/main-app-ebe9bcb4ef779fa1.js",
+      "static/chunks/138-51bfc1dc59fa35b7.js",
+      "static/chunks/app/caregiver/layout-d2eed78ad1b660c9.js"
     ],
     "/caregiver/analytics/page": [
       "static/chunks/webpack-b7eb15e779c34889.js",
@@ -67,6 +60,13 @@
       "static/chunks/main-app-ebe9bcb4ef779fa1.js",
       "static/chunks/59-f56cbd13ecf5223d.js",
       "static/chunks/app/caregiver/monitoring/page-dbd134d93c00594c.js"
+    ],
+    "/caregiver/page": [
+      "static/chunks/webpack-b7eb15e779c34889.js",
+      "static/chunks/fd9d1056-ce36d2dab1fe63d8.js",
+      "static/chunks/23-1ee2247c20c96319.js",
+      "static/chunks/main-app-ebe9bcb4ef779fa1.js",
+      "static/chunks/app/caregiver/page-e39f063577cb87bd.js"
     ],
     "/science/page": [
       "static/chunks/webpack-b7eb15e779c34889.js",
