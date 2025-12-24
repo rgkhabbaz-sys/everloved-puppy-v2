@@ -149,7 +149,7 @@ export default function MonitoringDashboard() {
     setConversation([]);
     setKillSwitchTriggered(false);
     setCurrentTier(1);
-    router.push('/patient');
+    router.push('/patient?start=true');
   };
 
   const handleEndInteraction = () => {
@@ -185,7 +185,7 @@ export default function MonitoringDashboard() {
     localStorage.setItem('everloved-game-start-time', startTime.toString());
     
     // Navigate to patient page (game renders there)
-    router.push('/patient');
+    router.push('/patient?start=true');
   };
 
   const handleEndGame = (gameId: string) => {
@@ -383,7 +383,7 @@ export default function MonitoringDashboard() {
                   }} />
                   <span style={{ color: colors.success, fontWeight: 600 }}>Active</span>
                 </div>
-                <button onClick={() => router.push('/patient')} style={{
+                <button onClick={() => router.push('/patient?start=true')} style={{
                   background: colors.accent, color: '#fff', border: 'none',
                   padding: '12px 24px', borderRadius: '10px', fontSize: '1rem',
                   fontWeight: 500, cursor: 'pointer',
