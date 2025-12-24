@@ -25,31 +25,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/patient/page.js"
-    ],
-    "/caregiver/settings/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/caregiver/settings/page.js"
-    ],
-    "/caregiver/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/caregiver/page.js"
-    ],
-    "/caregiver/analytics/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/caregiver/analytics/page.js"
-    ],
-    "/science/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/science/page.js"
-    ],
-    "/science/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/science/layout.js"
     ]
   }
 }
