@@ -41,6 +41,32 @@ const GAME_PALETTES = {
   }
 };
 
+// Bioluminescent Tide palettes - GREEN/CYAN day, warm amber night (no blue)
+const TIDE_PALETTES = {
+  day: {
+    glow: [0.2, 0.9, 0.6],      // Green/cyan glow
+    secondary: [0.1, 0.7, 0.5], // Soft aqua-green
+    bg1: '#0a1520',             // Deep ocean blue
+    bg2: '#061018',             // Darker ocean
+  },
+  night: {
+    glow: [1.0, 0.6, 0.0],      // Warm amber (ZERO blue)
+    secondary: [0.8, 0.4, 0.0], // Orange-amber
+    bg1: '#0f0808',             // Deep warm black (no blue)
+    bg2: '#080505',             // Darker warm black
+  }
+};
+
+// Dolphin type
+interface Dolphin {
+  x: number;
+  y: number;
+  depth: number;
+  speed: number;
+  phase: number;
+  direction: number;
+}
+
 export default function PatientComfort() {
   // ============================================
   // GAME STATE
@@ -53,20 +79,23 @@ export default function PatientComfort() {
   const [particleCount, setParticleCount] = useState(1500);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const weaverCanvasRef = useRef<HTMLCanvasElement>(null);
+  const tideCanvasRef = useRef<HTMLCanvasElement>(null);
   const gameAnimationRef = useRef<number>(0);
   const particlesRef = useRef<Float32Array | null>(null);
   const velocitiesRef = useRef<Float32Array | null>(null);
   const pointerRef = useRef({ x: 0.5, y: 0.5, active: false });
   const prevPointerRef = useRef({ x: 0.5, y: 0.5 });
   const timeRef = useRef(0);
-  const fpsHistoryRef = useRef<number[]>([]);
   const lastFrameTimeRef = useRef(performance.now());
-  const weaverPointsRef = useRef<{x: number, y: number, targetY: number}[]>([]);
-  const weaverTimeRef = useRef(0);
   const gameAudioContextRef = useRef<AudioContext | null>(null);
   const oscillatorsRef = useRef<OscillatorNode[]>([]);
   const gainNodesRef = useRef<GainNode[]>([]);
+  
+  // Bioluminescent Tide state
+  const tidePlanktonRef = useRef<{x: number, y: number, brightness: number, targetBrightness: number, phase: number}[]>([]);
+  const tideTimeRef = useRef(0);
+  const pointerHistoryRef = useRef<{x: number, y: number, time: number}[]>([]);
+  const dolphinsRef = useRef<Dolphin[]>([]);
 
   // ============================================
   // ORIGINAL VOICE STATE (UNCHANGED)
@@ -125,6 +154,17 @@ export default function PatientComfort() {
     };
   }, [colorTransition]);
 
+  const getTidePalette = useCallback(() => {
+    const t = colorTransition;
+    const lerp = (a: number[], b: number[]) => a.map((v, i) => v + (b[i] - v) * t);
+    return {
+      glow: lerp(TIDE_PALETTES.day.glow, TIDE_PALETTES.night.glow),
+      secondary: lerp(TIDE_PALETTES.day.secondary, TIDE_PALETTES.night.secondary),
+      bg1: t < 0.5 ? TIDE_PALETTES.day.bg1 : TIDE_PALETTES.night.bg1,
+      bg2: t < 0.5 ? TIDE_PALETTES.day.bg2 : TIDE_PALETTES.night.bg2,
+    };
+  }, [colorTransition]);
+
   const initParticles = useCallback((count: number) => {
     const positions = new Float32Array(count * 2);
     const velocities = new Float32Array(count * 2);
@@ -136,6 +176,28 @@ export default function PatientComfort() {
     }
     particlesRef.current = positions;
     velocitiesRef.current = velocities;
+  }, []);
+
+  const initTidePlankton = useCallback(() => {
+    const plankton: {x: number, y: number, brightness: number, targetBrightness: number, phase: number}[] = [];
+    const count = 3000;
+    for (let i = 0; i < count; i++) {
+      plankton.push({
+        x: Math.random(),
+        y: Math.random(),
+        brightness: 0,
+        targetBrightness: 0,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+    tidePlanktonRef.current = plankton;
+    
+    // Initialize 3 dolphins at different depths
+    dolphinsRef.current = [
+      { x: -0.2, y: 0.3, depth: 0.6, speed: 0.008, phase: 0, direction: 1 },
+      { x: 1.2, y: 0.6, depth: 0.8, speed: 0.006, phase: Math.PI, direction: -1 },
+      { x: -0.3, y: 0.75, depth: 0.4, speed: 0.01, phase: Math.PI * 0.5, direction: 1 },
+    ];
   }, []);
 
   const initGameAudio = useCallback(() => {
@@ -220,10 +282,12 @@ export default function PatientComfort() {
   useEffect(() => {
     const check = () => {
       const hour = new Date().getHours();
-      const inWindow = hour >= 16 && hour < 20;
+      const inWindow = hour >= 16 || hour < 8; // Night mode for tide
       setIsSundowning(inWindow);
-      if (inWindow) {
+      if (hour >= 16 && hour < 20) {
         setColorTransition(Math.min(1, ((hour - 16) * 60 + new Date().getMinutes()) / 240));
+      } else if (hour >= 20 || hour < 8) {
+        setColorTransition(1);
       } else {
         setColorTransition(0);
       }
@@ -235,7 +299,7 @@ export default function PatientComfort() {
 
   // Game session timer
   useEffect(() => {
-    if (activeGame !== 'calm-current' && activeGame !== 'infinite-weaver') return;
+    if (activeGame !== 'calm-current' && activeGame !== 'bioluminescent-tide') return;
     const interval = setInterval(() => setGameSessionDuration(prev => prev + 1), 1000);
     return () => clearInterval(interval);
   }, [activeGame]);
@@ -385,12 +449,12 @@ export default function PatientComfort() {
   }, [activeGame, particleCount, initParticles, getGamePalette, updateGameAudio, cleanupGameAudio]);
 
   // ============================================
-  // INFINITE WEAVER RENDER LOOP
+  // BIOLUMINESCENT TIDE RENDER LOOP - PASSIVE HOVER + DOLPHINS
   // ============================================
   useEffect(() => {
-    if (activeGame !== 'infinite-weaver') return;
+    if (activeGame !== 'bioluminescent-tide') return;
 
-    const canvas = weaverCanvasRef.current;
+    const canvas = tideCanvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d', { alpha: false });
@@ -405,110 +469,205 @@ export default function PatientComfort() {
     resize();
     window.addEventListener('resize', resize);
 
-    const numPoints = 100;
-    weaverPointsRef.current = [];
-    for (let i = 0; i < numPoints; i++) {
-      weaverPointsRef.current.push({ x: i / (numPoints - 1), y: 0.5, targetY: 0.5 });
-    }
-    
-    weaverTimeRef.current = 0;
+    initTidePlankton();
+    tideTimeRef.current = 0;
     lastFrameTimeRef.current = performance.now();
 
     const render = () => {
       const now = performance.now();
       const deltaTime = (now - lastFrameTimeRef.current) / 1000;
       lastFrameTimeRef.current = now;
-      weaverTimeRef.current += deltaTime;
+      tideTimeRef.current += deltaTime;
 
-      const palette = getGamePalette();
+      const palette = getTidePalette();
       const width = window.innerWidth;
       const height = window.innerHeight;
+      const isNightMode = colorTransition > 0.5;
 
-      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      // Draw deep ocean background with hazy texture
+      const gradient = ctx.createRadialGradient(
+        width / 2, height / 2, 0,
+        width / 2, height / 2, Math.max(width, height) * 0.7
+      );
       gradient.addColorStop(0, palette.bg1);
       gradient.addColorStop(1, palette.bg2);
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
 
-      const points = weaverPointsRef.current;
+      // Add subtle atmospheric haze
+      ctx.globalAlpha = 0.03;
+      for (let i = 0; i < 5; i++) {
+        const hx = width * (0.3 + Math.sin(tideTimeRef.current * 0.1 + i) * 0.2);
+        const hy = height * (0.3 + Math.cos(tideTimeRef.current * 0.08 + i * 2) * 0.2);
+        const hGradient = ctx.createRadialGradient(hx, hy, 0, hx, hy, 300);
+        hGradient.addColorStop(0, `rgba(${Math.floor(palette.secondary[0]*255)}, ${Math.floor(palette.secondary[1]*255)}, ${Math.floor(palette.secondary[2]*255)}, 0.3)`);
+        hGradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = hGradient;
+        ctx.fillRect(0, 0, width, height);
+      }
+      ctx.globalAlpha = 1;
+
+      // Clean up old pointer history (keep last 5 seconds for trail effect)
+      const currentTime = tideTimeRef.current;
+      pointerHistoryRef.current = pointerHistoryRef.current.filter(p => currentTime - p.time < 5);
+
+      // Update dolphins - slow swimming
+      const dolphins = dolphinsRef.current;
+      for (const dolphin of dolphins) {
+        dolphin.x += dolphin.speed * dolphin.direction * deltaTime * 10;
+        dolphin.y += Math.sin(tideTimeRef.current * 0.5 + dolphin.phase) * 0.001;
+        
+        // Wrap around
+        if (dolphin.direction > 0 && dolphin.x > 1.3) {
+          dolphin.x = -0.3;
+          dolphin.y = 0.2 + Math.random() * 0.6;
+        } else if (dolphin.direction < 0 && dolphin.x < -0.3) {
+          dolphin.x = 1.3;
+          dolphin.y = 0.2 + Math.random() * 0.6;
+        }
+      }
+
+      // Update plankton brightness based on pointer proximity (PASSIVE HOVER)
+      const plankton = tidePlanktonRef.current;
       const pointer = pointerRef.current;
-
-      const waveSpeed = (2 * Math.PI) / 30;
-      const baseAmplitude = 0.12;
       
-      for (let i = 0; i < points.length; i++) {
-        const baseX = i / (points.length - 1);
-        const dxFromPointer = Math.abs(baseX - pointer.x);
+      for (let i = 0; i < plankton.length; i++) {
+        const p = plankton[i];
         
-        let localAmplitude = baseAmplitude;
-        if (pointer.active && dxFromPointer < 0.4) {
-          const proximity = 1 - (dxFromPointer / 0.4);
-          localAmplitude = baseAmplitude + proximity * 0.375;
+        // Base breathing brightness
+        let targetBrightness = 0.02 + Math.sin(tideTimeRef.current * 0.5 + p.phase) * 0.01;
+        
+        // PASSIVE HOVER: Check proximity to current pointer (no click needed)
+        if (pointer.active) {
+          const dx = p.x - pointer.x;
+          const dy = p.y - pointer.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < 0.15) {
+            const proximity = 1 - dist / 0.15;
+            targetBrightness += proximity * 0.7;
+          }
         }
         
-        const phase1 = weaverTimeRef.current * waveSpeed + baseX * Math.PI * 3;
-        const phase2 = weaverTimeRef.current * waveSpeed * 0.7 + baseX * Math.PI * 1.5;
-        
-        let targetY = 0.5 + Math.sin(phase1) * localAmplitude + Math.sin(phase2) * localAmplitude * 0.3;
-        
-        if (pointer.active && dxFromPointer < 0.3) {
-          const pullStrength = (1 - dxFromPointer / 0.3) * 0.5;
-          targetY = targetY * (1 - pullStrength) + pointer.y * pullStrength;
+        // Check proximity to pointer trail (3-5 second dissipation)
+        for (const trail of pointerHistoryRef.current) {
+          const dx = p.x - trail.x;
+          const dy = p.y - trail.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const age = currentTime - trail.time;
+          const fadeOut = Math.max(0, 1 - age / 5); // 5 second fade
+          
+          if (dist < 0.12 && fadeOut > 0) {
+            const proximity = (1 - dist / 0.12) * fadeOut;
+            targetBrightness += proximity * 0.5;
+          }
         }
         
-        points[i].targetY = targetY;
-        points[i].y += (points[i].targetY - points[i].y) * 0.08;
+        // Check proximity to dolphins - they light up plankton as they pass
+        for (const dolphin of dolphins) {
+          const dx = p.x - dolphin.x;
+          const dy = p.y - dolphin.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < 0.1) {
+            const proximity = 1 - dist / 0.1;
+            targetBrightness += proximity * 0.4 * dolphin.depth;
+          }
+        }
+        
+        p.targetBrightness = Math.min(1, targetBrightness);
+        
+        // GLACIAL: Very slow brightness transition
+        p.brightness += (p.targetBrightness - p.brightness) * 0.015;
+        
+        // Only draw if visible
+        if (p.brightness > 0.01) {
+          const screenX = p.x * width;
+          const screenY = p.y * height;
+          const size = 2 + p.brightness * 4;
+          const alpha = Math.min(0.9, p.brightness);
+          
+          // Night mode: ensure zero blue channel
+          let r = palette.glow[0];
+          let g = palette.glow[1];
+          let b = isNightMode ? 0 : palette.glow[2]; // Zero blue at night
+          
+          ctx.globalCompositeOperation = 'lighter';
+          const glowGradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, size * 3);
+          glowGradient.addColorStop(0, `rgba(${Math.floor(r*255)}, ${Math.floor(g*255)}, ${Math.floor(b*255)}, ${alpha})`);
+          glowGradient.addColorStop(0.5, `rgba(${Math.floor(r*255)}, ${Math.floor(g*255)}, ${Math.floor(b*255)}, ${alpha * 0.3})`);
+          glowGradient.addColorStop(1, 'transparent');
+          
+          ctx.fillStyle = glowGradient;
+          ctx.beginPath();
+          ctx.arc(screenX, screenY, size * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
-      ctx.globalCompositeOperation = 'lighter';
-      
-      const glowLayers = [
-        { blur: 40, alpha: 0.1, width: 60 },
-        { blur: 25, alpha: 0.15, width: 40 },
-        { blur: 15, alpha: 0.2, width: 25 },
-        { blur: 8, alpha: 0.3, width: 15 },
-        { blur: 0, alpha: 0.5, width: 6 },
-      ];
-
-      glowLayers.forEach(layer => {
-        ctx.save();
-        ctx.filter = layer.blur > 0 ? `blur(${layer.blur}px)` : 'none';
-        ctx.strokeStyle = `rgba(${Math.floor(palette.primary[0] * 255)}, ${Math.floor(palette.primary[1] * 255)}, ${Math.floor(palette.primary[2] * 255)}, ${layer.alpha})`;
-        ctx.lineWidth = layer.width;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        
-        ctx.beginPath();
-        ctx.moveTo(points[0].x * width, points[0].y * height);
-        
-        for (let i = 1; i < points.length - 1; i++) {
-          const xc = (points[i].x * width + points[i + 1].x * width) / 2;
-          const yc = (points[i].y * height + points[i + 1].y * height) / 2;
-          ctx.quadraticCurveTo(points[i].x * width, points[i].y * height, xc, yc);
-        }
-        ctx.lineTo(points[points.length - 1].x * width, points[points.length - 1].y * height);
-        
-        ctx.stroke();
-        ctx.restore();
-      });
-
+      // Draw dolphins as soft, translucent silhouettes
       ctx.globalCompositeOperation = 'source-over';
-
-      if (pointer.active) {
-        const glow = palette.glow;
-        ctx.globalAlpha = 0.15;
-        const cursorGradient = ctx.createRadialGradient(
-          pointer.x * width, pointer.y * height, 0,
-          pointer.x * width, pointer.y * height, 60
-        );
-        cursorGradient.addColorStop(0, `rgba(${Math.floor(glow[0]*255)}, ${Math.floor(glow[1]*255)}, ${Math.floor(glow[2]*255)}, 0.4)`);
-        cursorGradient.addColorStop(1, `rgba(${Math.floor(glow[0]*255)}, ${Math.floor(glow[1]*255)}, ${Math.floor(glow[2]*255)}, 0)`);
-        ctx.fillStyle = cursorGradient;
+      for (const dolphin of dolphins) {
+        const dx = dolphin.x * width;
+        const dy = dolphin.y * height;
+        const scale = 40 + dolphin.depth * 60;
+        
+        // Check if dolphin is near active plankton for glow effect
+        let dolphinGlow = 0;
+        for (const p of plankton) {
+          const pdx = p.x - dolphin.x;
+          const pdy = p.y - dolphin.y;
+          const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
+          if (pdist < 0.1 && p.brightness > 0.1) {
+            dolphinGlow += p.brightness * (1 - pdist / 0.1) * 0.3;
+          }
+        }
+        dolphinGlow = Math.min(0.5, dolphinGlow);
+        
+        ctx.save();
+        ctx.translate(dx, dy);
+        ctx.scale(dolphin.direction, 1);
+        
+        // Soft blur effect
+        ctx.filter = `blur(${8 - dolphin.depth * 4}px)`;
+        ctx.globalAlpha = 0.15 + dolphin.depth * 0.15 + dolphinGlow;
+        
+        // Dolphin color - catches glow
+        let dolphinR = 100 + dolphinGlow * palette.glow[0] * 155;
+        let dolphinG = 180 + dolphinGlow * palette.glow[1] * 75;
+        let dolphinB = isNightMode ? 0 : (200 + dolphinGlow * palette.glow[2] * 55);
+        
+        ctx.fillStyle = `rgb(${Math.floor(dolphinR)}, ${Math.floor(dolphinG)}, ${Math.floor(dolphinB)})`;
+        
+        // Draw dolphin shape
         ctx.beginPath();
-        ctx.arc(pointer.x * width, pointer.y * height, 60, 0, Math.PI * 2);
+        ctx.moveTo(-scale, 0);
+        ctx.quadraticCurveTo(-scale * 0.5, -scale * 0.4, scale * 0.2, -scale * 0.1);
+        ctx.quadraticCurveTo(scale * 0.8, -scale * 0.3, scale, 0);
+        ctx.quadraticCurveTo(scale * 0.8, scale * 0.2, scale * 0.2, scale * 0.1);
+        ctx.quadraticCurveTo(-scale * 0.5, scale * 0.3, -scale, 0);
         ctx.fill();
-        ctx.globalAlpha = 1;
+        
+        // Tail fin
+        ctx.beginPath();
+        ctx.moveTo(-scale, 0);
+        ctx.quadraticCurveTo(-scale * 1.3, -scale * 0.3, -scale * 1.2, -scale * 0.5);
+        ctx.quadraticCurveTo(-scale * 1.1, 0, -scale * 1.2, scale * 0.5);
+        ctx.quadraticCurveTo(-scale * 1.3, scale * 0.3, -scale, 0);
+        ctx.fill();
+        
+        // Dorsal fin
+        ctx.beginPath();
+        ctx.moveTo(0, -scale * 0.15);
+        ctx.quadraticCurveTo(scale * 0.1, -scale * 0.5, scale * 0.3, -scale * 0.15);
+        ctx.fill();
+        
+        ctx.restore();
       }
+
+      ctx.filter = 'none';
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
 
       gameAnimationRef.current = requestAnimationFrame(render);
     };
@@ -519,9 +678,9 @@ export default function PatientComfort() {
       window.removeEventListener('resize', resize);
       if (gameAnimationRef.current) cancelAnimationFrame(gameAnimationRef.current);
     };
-  }, [activeGame, getGamePalette]);
+  }, [activeGame, getTidePalette, initTidePlankton, colorTransition]);
 
-  // Game pointer handlers
+  // Game pointer handlers - PASSIVE HOVER (always tracking)
   const handleGamePointerMove = useCallback((e: React.PointerEvent | React.TouchEvent) => {
     let clientX: number, clientY: number;
     if ('touches' in e) {
@@ -531,12 +690,24 @@ export default function PatientComfort() {
       clientX = e.clientX;
       clientY = e.clientY;
     }
+    const newX = clientX / window.innerWidth;
+    const newY = clientY / window.innerHeight;
+    
     pointerRef.current = {
-      x: clientX / window.innerWidth,
-      y: clientY / window.innerHeight,
+      x: newX,
+      y: newY,
       active: true,
     };
-  }, []);
+    
+    // Add to pointer history for trail effect (Bioluminescent Tide)
+    if (activeGame === 'bioluminescent-tide') {
+      pointerHistoryRef.current.push({
+        x: newX,
+        y: newY,
+        time: tideTimeRef.current,
+      });
+    }
+  }, [activeGame]);
 
   const handleGamePointerDown = useCallback((e: React.PointerEvent | React.TouchEvent) => {
     if (!audioEnabled) initGameAudio();
@@ -953,7 +1124,7 @@ export default function PatientComfort() {
   };
 
   // ============================================
-  // WEBSOCKET EFFECT (UNCHANGED - only runs when no game active)
+  // WEBSOCKET EFFECT - FIX: Send start_session immediately (no conditional check)
   // ============================================
   useEffect(() => {
     if (!mounted || activeGame) return;
@@ -963,12 +1134,11 @@ export default function PatientComfort() {
 
     ws.onopen = () => {
       setIsConnected(true);
-      if (localStorage.getItem('everloved-session-active') === 'true') {
-        const patientName = localStorage.getItem('everloved-patient-name') || '';
-        const caregiverName = localStorage.getItem('everloved-caregiver-name') || '';
-        const lifeStory = localStorage.getItem('everloved-life-story') || '';
-        ws.send(JSON.stringify({ type: 'start_session', patientName, caregiverName, lifeStory }));
-      }
+      // FIX: Send start_session immediately with patient context (removed conditional check)
+      const patientName = localStorage.getItem('everloved-patient-name') || '';
+      const caregiverName = localStorage.getItem('everloved-caregiver-name') || '';
+      const lifeStory = localStorage.getItem('everloved-life-story') || '';
+      ws.send(JSON.stringify({ type: 'start_session', patientName, caregiverName, lifeStory }));
     };
 
     ws.onmessage = async (event) => {
@@ -1133,9 +1303,9 @@ export default function PatientComfort() {
   }
 
   // ============================================
-  // RENDER: INFINITE WEAVER GAME
+  // RENDER: BIOLUMINESCENT TIDE GAME
   // ============================================
-  if (activeGame === 'infinite-weaver') {
+  if (activeGame === 'bioluminescent-tide') {
     return (
       <div
         style={{
@@ -1149,7 +1319,7 @@ export default function PatientComfort() {
         onTouchStart={handleGamePointerDown}
         onTouchEnd={handleGamePointerLeave}
       >
-        <canvas ref={weaverCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+        <canvas ref={tideCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
 
         <Link href="/caregiver/monitoring" style={{
           position: 'absolute', top: '20px', right: '20px', padding: '12px 20px',
@@ -1163,11 +1333,11 @@ export default function PatientComfort() {
         {isSundowning && (
           <div style={{
             position: 'absolute', top: '20px', left: '20px',
-            background: 'rgba(255,100,50,0.2)', border: '1px solid rgba(255,100,50,0.3)',
+            background: 'rgba(255,140,0,0.2)', border: '1px solid rgba(255,140,0,0.3)',
             borderRadius: '20px', padding: '8px 16px',
-            color: 'rgba(255,200,150,0.9)', fontSize: '0.75rem', zIndex: 100,
+            color: 'rgba(255,200,150,0.8)', fontSize: '0.75rem', zIndex: 100,
           }}>
-            🌅 Sundowning Hours
+            🌙 Night Mode Active
           </div>
         )}
 
