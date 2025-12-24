@@ -750,7 +750,7 @@ export default function PatientComfort() {
           const reader = new FileReader();
           reader.onload = () => {
             const base64 = (reader.result as string).split(',')[1];
-            wsRef.current?.send(JSON.stringify({ type: 'audio', audio: base64 }));
+            wsRef.current?.send(JSON.stringify({ type: 'audio_data', audio: base64 }));
           };
           reader.readAsDataURL(event.data);
         }
