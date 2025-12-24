@@ -642,7 +642,7 @@ export default function PatientComfort() {
       const ws = new WebSocket('wss://ease-backend-production.up.railway.app');
       wsRef.current = ws;
 
-      ws.onopen = () => { if (!hasAutoStarted.current) ws.send(JSON.stringify({ type: 'start_session', patientName: 'Patient', caregiverName: 'Caregiver', lifeStory: '' }));
+      ws.onopen = () => { if (!hasAutoStarted.current) { hasAutoStarted.current = true; ws.send(JSON.stringify({ type: 'start_session', patientName: 'Patient', caregiverName: 'Caregiver', lifeStory: '' })); }
         setIsConnected(true);
         setStatusMessage('Tap anywhere to talk to me');
         setFailCount(0);
