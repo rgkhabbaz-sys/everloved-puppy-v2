@@ -1,9 +1,9 @@
 {
   "pages": {
-    "/patient/page": [
+    "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/patient/page.js"
+      "static/chunks/app/page.js"
     ],
     "/layout": [
       "static/chunks/webpack.js",
@@ -21,20 +21,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/caregiver/layout.js"
     ],
-    "/science/page": [
+    "/patient/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/science/page.js"
-    ],
-    "/science/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/science/layout.js"
-    ],
-    "/caregiver/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/caregiver/page.js"
+      "static/chunks/app/patient/page.js"
     ]
   }
 }

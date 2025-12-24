@@ -85,6 +85,15 @@ export default function MonitoringDashboard() {
     prevConversationLength.current = conversation.length;
   }, [conversation]);
 
+  // Check for active game on mount
+  useEffect(() => {
+    const savedGame = localStorage.getItem('everloved-active-game');
+    if (savedGame) {
+      setActiveGame(savedGame);
+      setSelectedGame(savedGame);
+    }
+  }, []);
+
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -112,9 +121,9 @@ export default function MonitoringDashboard() {
     setSessionDuration(0);
   };
 
-  // Game intervention handlers (UI mockup only - no game logic yet)
+  // Game intervention handlers
   const handleGameSelect = (gameId: string) => {
-    if (activeGame) return; // Can't change selection while game is running
+    if (activeGame) return;
     setSelectedGame(selectedGame === gameId ? null : gameId);
   };
 
@@ -122,7 +131,10 @@ export default function MonitoringDashboard() {
     if (activeGame || selectedGame !== gameId) return;
     console.log(`Starting game: ${gameId}`);
     setActiveGame(gameId);
-    // Future: Navigate to game or launch game overlay
+    localStorage.setItem('everloved-active-game', gameId);
+    
+    // Navigate to patient page (game renders there)
+    router.push('/patient');
   };
 
   const handleEndGame = (gameId: string) => {
@@ -130,7 +142,7 @@ export default function MonitoringDashboard() {
     console.log(`Ending game: ${gameId}`);
     setActiveGame(null);
     setSelectedGame(null);
-    // Future: Return to monitoring view, log session data
+    localStorage.removeItem('everloved-active-game');
   };
 
   const sentimentGlow = getSentimentGlow();
@@ -174,14 +186,14 @@ export default function MonitoringDashboard() {
     },
     {
       id: 'calm-current',
-      game: 'The Calm Current',
+      game: 'The Sand-Painter',
       stage: 'STAGE 3',
-      subText: 'Physiological Rescue',
+      subText: 'Kinetic Grounding',
       protocol: 'De-escalation',
-      note: 'Use for acute agitation or sundowning. Activates Guardian Mode.',
+      note: 'Use for restless agitation or sundowning. Channels energy into calming visuals.',
       color: '#4682B4',
       borderColor: '#36648B',
-      image: '/games/calm-current.png',
+      image: '/games/sand-painter.png',
     },
   ];
 
