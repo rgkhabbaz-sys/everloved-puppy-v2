@@ -26,28 +26,31 @@ const curlNoise = (x: number, y: number, time: number): { dx: number; dy: number
 
 const GAME_PALETTES = {
   day: {
-    primary: [1.0, 0.7, 0.2],
-    secondary: [1.0, 0.5, 0.1],
+    primary: [1.0, 0.7, 0.2],      // Amber gold
+    secondary: [1.0, 0.5, 0.1],    // Deep amber
     glow: [1.0, 0.75, 0.3],
-    bg1: '#0a0a18',
+    bg1: '#0a0a18',                // Very dark blue-black
     bg2: '#12122a',
   },
   sunset: {
-    primary: [1.0, 0.55, 0.1],
-    secondary: [0.95, 0.4, 0.1],
+    primary: [1.0, 0.55, 0.1],     // Warm amber
+    secondary: [0.95, 0.4, 0.1],   // Burnt orange
     glow: [1.0, 0.6, 0.2],
-    bg1: '#0f0805',
+    bg1: '#0f0805',                // Very dark warm
     bg2: '#1a100a',
   }
 };
 
 export default function PatientComfort() {
+  // ============================================
+  // GAME STATE
+  // ============================================
   const [activeGame, setActiveGame] = useState<string | null>(null);
   const [isSundowning, setIsSundowning] = useState(false);
   const [colorTransition, setColorTransition] = useState(0);
   const [gameSessionDuration, setGameSessionDuration] = useState(0);
   const [audioEnabled, setAudioEnabled] = useState(false);
-  const [particleCount, setParticleCount] = useState(1500);
+  const [particleCount, setParticleCount] = useState(1500); // Low count for Alzheimer's patients
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const weaverCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -60,6 +63,7 @@ export default function PatientComfort() {
   const fpsHistoryRef = useRef<number[]>([]);
   const lastFrameTimeRef = useRef(performance.now());
   
+  // Weaver-specific refs
   const weaverPointsRef = useRef<{x: number, y: number, targetY: number}[]>([]);
   const weaverTimeRef = useRef(0);
   
@@ -67,6 +71,9 @@ export default function PatientComfort() {
   const oscillatorsRef = useRef<OscillatorNode[]>([]);
   const gainNodesRef = useRef<GainNode[]>([]);
 
+  // ============================================
+  // ORIGINAL PATIENT PAGE STATE
+  // ============================================
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -86,11 +93,6 @@ export default function PatientComfort() {
   const [showBreathPacer, setShowBreathPacer] = useState(false);
   const [breathPacerScale, setBreathPacerScale] = useState(1);
   const [breathCycleRate, setBreathCycleRate] = useState(20);
-
-  // DEBUG STATE
-  const [debugAutoStarted, setDebugAutoStarted] = useState(false);
-  const [debugWsState, setDebugWsState] = useState('not started');
-  const [debugMicState, setDebugMicState] = useState('not started');
   
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -111,6 +113,9 @@ export default function PatientComfort() {
   const breathIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const breathDecelerationRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ============================================
+  // GAME HELPER FUNCTIONS
+  // ============================================
   const getGamePalette = useCallback(() => {
     const t = colorTransition;
     const lerp = (a: number[], b: number[]) => a.map((v, i) => v + (b[i] - v) * t);
@@ -127,10 +132,10 @@ export default function PatientComfort() {
     const positions = new Float32Array(count * 2);
     const velocities = new Float32Array(count * 2);
     for (let i = 0; i < count; i++) {
-      positions[i * 2] = 0.15 + Math.random() * 0.7;
+      positions[i * 2] = 0.15 + Math.random() * 0.7;  // Wider spread
       positions[i * 2 + 1] = -0.1 - Math.random() * 0.5;
-      velocities[i * 2] = (Math.random() - 0.5) * 0.0005;
-      velocities[i * 2 + 1] = 0.00025 + Math.random() * 0.0005;
+      velocities[i * 2] = (Math.random() - 0.5) * 0.0005;  // 50% slower
+      velocities[i * 2 + 1] = 0.00025 + Math.random() * 0.0005;  // 50% slower
     }
     particlesRef.current = positions;
     velocitiesRef.current = velocities;
@@ -177,6 +182,9 @@ export default function PatientComfort() {
     });
   }, []);
 
+  // ============================================
+  // ORIGINAL HELPER FUNCTIONS
+  // ============================================
   const saveToLog = (speaker: 'patient' | 'companion' | 'system', text: string) => {
     try {
       const existing = JSON.parse(localStorage.getItem('everloved-conversation-log') || '[]');
@@ -200,6 +208,9 @@ export default function PatientComfort() {
     cardBorder: 'rgba(232, 201, 160, 0.4)',
   };
 
+  // ============================================
+  // CHECK FOR ACTIVE GAME
+  // ============================================
   useEffect(() => {
     const check = () => setActiveGame(localStorage.getItem('everloved-active-game'));
     check();
@@ -207,6 +218,7 @@ export default function PatientComfort() {
     return () => clearInterval(interval);
   }, []);
 
+  // Check sundowning
   useEffect(() => {
     const check = () => {
       const hour = new Date().getHours();
@@ -223,12 +235,16 @@ export default function PatientComfort() {
     return () => clearInterval(interval);
   }, []);
 
+  // Game session timer (works for all games)
   useEffect(() => {
     if (activeGame !== 'calm-current' && activeGame !== 'infinite-weaver') return;
     const interval = setInterval(() => setGameSessionDuration(prev => prev + 1), 1000);
     return () => clearInterval(interval);
   }, [activeGame]);
 
+  // ============================================
+  // GAME RENDER LOOP (SAND PAINTER)
+  // ============================================
   useEffect(() => {
     if (activeGame !== 'calm-current') {
       if (gameAnimationRef.current) cancelAnimationFrame(gameAnimationRef.current);
@@ -258,8 +274,9 @@ export default function PatientComfort() {
       const now = performance.now();
       const deltaTime = Math.min((now - lastFrameTimeRef.current) / 16.67, 3);
       lastFrameTimeRef.current = now;
-      timeRef.current += 0.005;
+      timeRef.current += 0.005;  // 50% slower time progression
 
+      // FPS-based quality scaling
       const fps = 1000 / Math.max(1, now - lastFrameTimeRef.current);
       fpsHistoryRef.current.push(fps);
       if (fpsHistoryRef.current.length > 180) {
@@ -277,6 +294,7 @@ export default function PatientComfort() {
       const width = window.innerWidth;
       const height = window.innerHeight;
 
+      // Background gradient
       const gradient = ctx.createLinearGradient(0, 0, 0, height);
       gradient.addColorStop(0, palette.bg1);
       gradient.addColorStop(1, palette.bg2);
@@ -306,12 +324,15 @@ export default function PatientComfort() {
         let vx = velocities[idx];
         let vy = velocities[idx + 1];
 
+        // Gravity - 50% slower
         vy += 0.000015 * deltaTime;
 
+        // Curl noise - 50% slower
         const curl = curlNoise(x * 3, y * 3, timeRef.current);
         vx += curl.dx * 0.000005 * deltaTime;
         vy += curl.dy * 0.000005 * deltaTime;
 
+        // Pointer turbulence - 50% slower
         if (pointer.active) {
           const dx = x - pointer.x;
           const dy = y - pointer.y;
@@ -325,17 +346,19 @@ export default function PatientComfort() {
           }
         }
 
+        // Damping
         vx *= 0.995;
         vy *= 0.995;
 
         x += vx * deltaTime;
         y += vy * deltaTime;
 
+        // Respawn at top with wider spread
         if (y > 1.1 || x < -0.1 || x > 1.1) {
           x = 0.15 + Math.random() * 0.7;
           y = -0.05;
-          vx = (Math.random() - 0.5) * 0.0005;
-          vy = 0.00025 + Math.random() * 0.0005;
+          vx = (Math.random() - 0.5) * 0.0005;  // 50% slower
+          vy = 0.00025 + Math.random() * 0.0005;  // 50% slower
         }
 
         positions[idx] = x;
@@ -344,6 +367,7 @@ export default function PatientComfort() {
         velocities[idx + 1] = vy;
         totalVelocity += Math.abs(vx) + Math.abs(vy);
 
+        // Render - larger particles since fewer
         const screenX = x * width;
         const screenY = y * height;
         const speed = Math.sqrt(vx * vx + vy * vy);
@@ -363,6 +387,7 @@ export default function PatientComfort() {
       ctx.globalCompositeOperation = 'source-over';
       updateGameAudio(totalVelocity / count);
 
+      // Cursor glow
       if (pointer.active) {
         const glow = palette.glow;
         ctx.fillStyle = `rgba(${Math.floor(glow[0]*255)}, ${Math.floor(glow[1]*255)}, ${Math.floor(glow[2]*255)}, 0.15)`;
@@ -387,6 +412,9 @@ export default function PatientComfort() {
     };
   }, [activeGame, particleCount, initParticles, getGamePalette, updateGameAudio, cleanupGameAudio]);
 
+  // ============================================
+  // GAME RENDER LOOP (INFINITE WEAVER)
+  // ============================================
   useEffect(() => {
     if (activeGame !== 'infinite-weaver') {
       return;
@@ -407,6 +435,7 @@ export default function PatientComfort() {
     resize();
     window.addEventListener('resize', resize);
 
+    // Initialize weaver filament points
     const numPoints = 100;
     weaverPointsRef.current = [];
     for (let i = 0; i < numPoints; i++) {
@@ -430,6 +459,7 @@ export default function PatientComfort() {
       const width = window.innerWidth;
       const height = window.innerHeight;
 
+      // Background
       const gradient = ctx.createLinearGradient(0, 0, 0, height);
       gradient.addColorStop(0, palette.bg1);
       gradient.addColorStop(1, palette.bg2);
@@ -439,37 +469,47 @@ export default function PatientComfort() {
       const points = weaverPointsRef.current;
       const pointer = pointerRef.current;
 
-      const waveSpeed = (2 * Math.PI) / 30;
-      const baseAmplitude = 0.12;
+      // Update filament points - cursor affects undulation amplitude
+      const waveSpeed = (2 * Math.PI) / 30; // Slightly faster for better feedback
+      const baseAmplitude = 0.12; // Base gentle wave (50% more pronounced)
       
       for (let i = 0; i < points.length; i++) {
         const baseX = i / (points.length - 1);
         
+        // Calculate distance from cursor to this point on the x-axis
         const dxFromPointer = Math.abs(baseX - pointer.x);
         
+        // Cursor proximity increases local amplitude (creates ripples/undulations)
         let localAmplitude = baseAmplitude;
         if (pointer.active && dxFromPointer < 0.4) {
+          // Amplitude increases dramatically near cursor
           const proximity = 1 - (dxFromPointer / 0.4);
-          localAmplitude = baseAmplitude + proximity * 0.375;
+          localAmplitude = baseAmplitude + proximity * 0.375; // 50% more (was 0.25)
         }
         
+        // Multiple sine waves for more organic movement
         const phase1 = weaverTimeRef.current * waveSpeed + baseX * Math.PI * 3;
         const phase2 = weaverTimeRef.current * waveSpeed * 0.7 + baseX * Math.PI * 1.5;
         
+        // Base wave motion
         let targetY = 0.5 + Math.sin(phase1) * localAmplitude + Math.sin(phase2) * localAmplitude * 0.3;
         
+        // Direct cursor pull - filament bends toward cursor
         if (pointer.active && dxFromPointer < 0.3) {
-          const pullStrength = (1 - dxFromPointer / 0.3) * 0.5;
+          const pullStrength = (1 - dxFromPointer / 0.3) * 0.5; // 50% more pull
           targetY = targetY * (1 - pullStrength) + pointer.y * pullStrength;
         }
         
         points[i].targetY = targetY;
         
+        // Faster interpolation for more responsive feel
         points[i].y += (points[i].targetY - points[i].y) * 0.08;
       }
 
+      // Draw the filament with soft glow
       ctx.globalCompositeOperation = 'lighter';
       
+      // Multiple passes for soft glow effect
       const glowLayers = [
         { blur: 40, alpha: 0.1, width: 60 },
         { blur: 25, alpha: 0.15, width: 40 },
@@ -489,6 +529,7 @@ export default function PatientComfort() {
         ctx.beginPath();
         ctx.moveTo(points[0].x * width, points[0].y * height);
         
+        // Smooth curve through points
         for (let i = 1; i < points.length - 1; i++) {
           const xc = (points[i].x * width + points[i + 1].x * width) / 2;
           const yc = (points[i].y * height + points[i + 1].y * height) / 2;
@@ -500,6 +541,7 @@ export default function PatientComfort() {
         ctx.restore();
       });
 
+      // Add secondary color thread interweaving
       ctx.save();
       ctx.filter = 'blur(12px)';
       ctx.strokeStyle = `rgba(${Math.floor(palette.secondary[0] * 255)}, ${Math.floor(palette.secondary[1] * 255)}, ${Math.floor(palette.secondary[2] * 255)}, 0.25)`;
@@ -516,6 +558,7 @@ export default function PatientComfort() {
 
       ctx.globalCompositeOperation = 'source-over';
 
+      // Soft cursor glow
       if (pointer.active) {
         const glow = palette.glow;
         ctx.globalAlpha = 0.15;
@@ -543,6 +586,7 @@ export default function PatientComfort() {
     };
   }, [activeGame, getGamePalette]);
 
+  // Game pointer handlers (works for both games)
   const handleGamePointerMove = useCallback((e: React.PointerEvent | React.TouchEvent) => {
     let clientX: number, clientY: number;
     if ('touches' in e) {
@@ -555,7 +599,7 @@ export default function PatientComfort() {
     pointerRef.current = {
       x: clientX / window.innerWidth,
       y: clientY / window.innerHeight,
-      active: true,
+      active: true,  // Always active when moving
     };
     if ('vibrate' in navigator && 'touches' in e) navigator.vibrate(3);
   }, []);
@@ -566,12 +610,17 @@ export default function PatientComfort() {
   }, [audioEnabled, initGameAudio, handleGamePointerMove]);
 
   const handleGamePointerUp = useCallback(() => {
+    // Keep pointer position but mark as not actively pressing
+    // For weaver, we still want hover to work, so don't fully deactivate
   }, []);
 
   const handleGamePointerLeave = useCallback(() => {
     pointerRef.current.active = false;
   }, []);
 
+  // ============================================
+  // ORIGINAL PATIENT PAGE EFFECTS
+  // ============================================
   useEffect(() => {
     setMounted(true);
     setCircadianColors(getCircadianColors());
@@ -587,13 +636,9 @@ export default function PatientComfort() {
   }, []);
 
   useEffect(() => {
-    if (!mounted || activeGame) {
-      setDebugWsState(`BLOCKED: mounted=${mounted}, activeGame=${activeGame}`);
-      return;
-    }
+    if (!mounted || activeGame) return;
 
     const connectWebSocket = () => {
-      setDebugWsState('connecting...');
       const ws = new WebSocket('wss://ease-backend-production.up.railway.app');
       wsRef.current = ws;
 
@@ -601,19 +646,13 @@ export default function PatientComfort() {
         setIsConnected(true);
         setStatusMessage('Tap anywhere to talk to me');
         setFailCount(0);
-        setDebugWsState('CONNECTED');
         
         // Auto-start the conversation
-        setDebugAutoStarted(hasAutoStarted.current);
         if (!hasAutoStarted.current) {
           hasAutoStarted.current = true;
-          setDebugMicState('auto-start in 500ms...');
           setTimeout(() => {
-            setDebugMicState('calling startMicrophone...');
             startMicrophone();
           }, 500);
-        } else {
-          setDebugMicState('SKIPPED - already started');
         }
       };
 
@@ -675,13 +714,9 @@ export default function PatientComfort() {
         }
       };
 
-      ws.onerror = () => {
-        setIsConnected(false);
-        setDebugWsState('ERROR');
-      };
+      ws.onerror = () => setIsConnected(false);
       ws.onclose = () => {
         setIsConnected(false);
-        setDebugWsState('CLOSED');
         if (!killSwitchActive && failCount < 5) {
           setTimeout(() => {
             setFailCount(prev => prev + 1);
@@ -733,16 +768,10 @@ export default function PatientComfort() {
   };
 
   const startMicrophone = async () => {
-    setDebugMicState('startMicrophone called');
-    if (killSwitchActive) {
-      setDebugMicState('BLOCKED by killSwitch');
-      return;
-    }
+    if (killSwitchActive) return;
     try {
-      setDebugMicState('requesting mic access...');
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 } });
       streamRef.current = stream;
-      setDebugMicState('got stream, creating MediaRecorder...');
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
       mediaRecorderRef.current = mediaRecorder;
       mediaRecorder.ondataavailable = async (event) => {
@@ -758,12 +787,10 @@ export default function PatientComfort() {
       mediaRecorder.start(250);
       isStreamingRef.current = true;
       setIsListening(true);
-      setDebugMicState('LISTENING');
       setEarPerk(true);
       setTimeout(() => setEarPerk(false), 300);
     } catch (e) {
       console.error('Microphone error:', e);
-      setDebugMicState('ERROR: ' + (e as Error).message);
       setStatusMessage('Please allow microphone access');
     }
   };
@@ -800,39 +827,9 @@ export default function PatientComfort() {
 
   const gamePalette = getGamePalette();
 
-  // DEBUG PANEL - shows on all views
-  const DebugPanel = () => (
-    <div style={{
-      position: 'fixed',
-      bottom: '10px',
-      left: '10px',
-      background: 'rgba(0,0,0,0.85)',
-      color: '#0f0',
-      padding: '10px',
-      borderRadius: '8px',
-      fontSize: '12px',
-      fontFamily: 'monospace',
-      zIndex: 9999,
-      maxWidth: '300px',
-    }}>
-      <div style={{ fontWeight: 'bold', marginBottom: '5px', color: '#ff0' }}>DEBUG PANEL</div>
-      <div>activeGame: {activeGame === null ? 'null' : `"${activeGame}"`}</div>
-      <div>mounted: {mounted ? 'true' : 'false'}</div>
-      <div>wsState: {debugWsState}</div>
-      <div>isConnected: {isConnected ? 'true' : 'false'}</div>
-      <div>hasAutoStarted: {debugAutoStarted ? 'true' : 'false'}</div>
-      <div>micState: {debugMicState}</div>
-      <div>isListening: {isListening ? 'true' : 'false'}</div>
-      <div>killSwitch: {killSwitchActive ? 'true' : 'false'}</div>
-      <button 
-        onClick={() => localStorage.removeItem('everloved-active-game')}
-        style={{ marginTop: '8px', padding: '4px 8px', cursor: 'pointer' }}
-      >
-        Clear activeGame
-      </button>
-    </div>
-  );
-
+  // ============================================
+  // RENDER: SAND PAINTER GAME
+  // ============================================
   if (activeGame === 'calm-current') {
     return (
       <div
@@ -859,6 +856,7 @@ export default function PatientComfort() {
           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
         />
 
+        {/* Dashboard Link */}
         <Link
           href="/caregiver/monitoring"
           style={{
@@ -908,12 +906,14 @@ export default function PatientComfort() {
           </div>
         )}
 
-        <DebugPanel />
         <style jsx global>{`* { cursor: none !important; }`}</style>
       </div>
     );
   }
 
+  // ============================================
+  // RENDER: INFINITE WEAVER GAME
+  // ============================================
   if (activeGame === 'infinite-weaver') {
     return (
       <div
@@ -940,6 +940,7 @@ export default function PatientComfort() {
           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
         />
 
+        {/* Dashboard Link */}
         <Link
           href="/caregiver/monitoring"
           style={{
@@ -989,12 +990,14 @@ export default function PatientComfort() {
           Touch to gently guide the thread
         </div>
 
-        <DebugPanel />
         <style jsx global>{`* { cursor: none !important; }`}</style>
       </div>
     );
   }
 
+  // ============================================
+  // RENDER: NORMAL PATIENT COMFORT PAGE
+  // ============================================
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <Link
@@ -1089,8 +1092,6 @@ export default function PatientComfort() {
           {showBreathPacer && <p style={{ color: circadianColors.text, opacity: 0.6, marginTop: '20px', fontSize: '1rem' }}>Breathe with the light...</p>}
         </div>
       </div>
-
-      <DebugPanel />
 
       <style jsx>{`
         @keyframes photoBreath { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
