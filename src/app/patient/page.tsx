@@ -642,7 +642,7 @@ export default function PatientComfort() {
       const ws = new WebSocket('wss://ease-backend-production.up.railway.app');
       wsRef.current = ws;
 
-      ws.onopen = () => {
+      ws.onopen = () => { ws.send(JSON.stringify({ type: 'start_session', patientName: 'Patient', caregiverName: 'Caregiver', lifeStory: '' }));
         setIsConnected(true);
         setStatusMessage('Tap anywhere to talk to me');
         setFailCount(0);
@@ -666,7 +666,7 @@ export default function PatientComfort() {
             setIsProcessing(true);
           }
           if (data.type === 'llm_text') setStatusMessage(data.text);
-          if (data.type === 'audio_chunk') {
+          if (data.type === 'response_audio_chunk') {
             audioQueueRef.current.push(data.audio);
             if (!isPlayingQueueRef.current) playNextAudio();
           }
@@ -775,11 +775,11 @@ export default function PatientComfort() {
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
       mediaRecorderRef.current = mediaRecorder;
       mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0 && wsRef.current?.readyState === WebSocket.OPEN) {
+        if (event.data.size > 0 && wsRef.current?.readyState === WebSocket.OPEN && !isPlayingQueueRef.current) {
           const reader = new FileReader();
           reader.onload = () => {
             const base64 = (reader.result as string).split(',')[1];
-            wsRef.current?.send(JSON.stringify({ type: 'audio', audio: base64 }));
+            wsRef.current?.send(JSON.stringify({ type: 'audio_chunk', audio: base64 }));
           };
           reader.readAsDataURL(event.data);
         }
