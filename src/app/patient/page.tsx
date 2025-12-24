@@ -627,7 +627,7 @@ export default function PatientComfort() {
             setIsProcessing(true);
           }
           if (data.type === 'llm_text') setStatusMessage(data.text);
-          if (data.type === 'audio_chunk') {
+          if (data.type === 'response_audio_chunk') {
             audioQueueRef.current.push(data.audio);
             if (!isPlayingQueueRef.current) playNextAudio();
           }
