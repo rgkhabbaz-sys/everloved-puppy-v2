@@ -98,6 +98,23 @@ export default function PatientComfort() {
   const dolphinsRef = useRef<Dolphin[]>([]);
 
   // ============================================
+  // FROSTY WINDOW STATE
+  // ============================================
+  const frostyBgCanvasRef = useRef<HTMLCanvasElement>(null);
+  const frostySnowCanvasRef = useRef<HTMLCanvasElement>(null);
+  const frostyPhaseRef = useRef<'preview' | 'assault' | 'wipe'>('preview');
+  const frostyPhaseStartRef = useRef<number>(0);
+  const frostySnowballsRef = useRef<{x: number, y: number, size: number, rotation: number, progress: number, speed: number, landed: boolean, startX: number, startY: number}[]>([]);
+  const frostySpawnQueueRef = useRef<{x: number, y: number}[]>([]);
+  const frostyLastSpawnRef = useRef<number>(0);
+  const frostyWipeTimerRef = useRef<number>(0);
+  const frostyLastPointerRef = useRef<{x: number, y: number} | null>(null);
+  const frostyBgImageRef = useRef<HTMLImageElement | null>(null);
+  const frostySnowImageRef = useRef<HTMLImageElement | null>(null);
+  const frostyAnimationRef = useRef<number>(0);
+  const [frostyPhase, setFrostyPhase] = useState<'preview' | 'assault' | 'wipe'>('preview');
+
+  // ============================================
   // ORIGINAL VOICE STATE (UNCHANGED)
   // ============================================
   const [isConnected, setIsConnected] = useState(false);
@@ -297,12 +314,253 @@ export default function PatientComfort() {
     return () => clearInterval(interval);
   }, []);
 
-  // Game session timer
+  // Game session timer - UPDATED to include frosty-window
   useEffect(() => {
-    if (activeGame !== 'calm-current' && activeGame !== 'bioluminescent-tide') return;
+    if (activeGame !== 'calm-current' && activeGame !== 'bioluminescent-tide' && activeGame !== 'frosty-window') return;
     const interval = setInterval(() => setGameSessionDuration(prev => prev + 1), 1000);
     return () => clearInterval(interval);
   }, [activeGame]);
+
+  // ============================================
+  // FROSTY WINDOW: Load images
+  // ============================================
+  useEffect(() => {
+    if (activeGame !== 'frosty-window') return;
+    
+    const bgImg = new Image();
+    const snowImg = new Image();
+    
+    bgImg.onload = () => { frostyBgImageRef.current = bgImg; };
+    snowImg.onload = () => { frostySnowImageRef.current = snowImg; };
+    
+    bgImg.src = '/games/switzerland_bg.jpg';
+    snowImg.src = '/games/snowball.png';
+    
+    return () => {
+      bgImg.onload = null;
+      snowImg.onload = null;
+    };
+  }, [activeGame]);
+
+  // ============================================
+  // FROSTY WINDOW: Game loop
+  // ============================================
+  useEffect(() => {
+    if (activeGame !== 'frosty-window') {
+      if (frostyAnimationRef.current) cancelAnimationFrame(frostyAnimationRef.current);
+      return;
+    }
+
+    const bgCanvas = frostyBgCanvasRef.current;
+    const snowCanvas = frostySnowCanvasRef.current;
+    if (!bgCanvas || !snowCanvas) return;
+
+    const bgCtx = bgCanvas.getContext('2d');
+    const snowCtx = snowCanvas.getContext('2d');
+    if (!bgCtx || !snowCtx) return;
+
+    // Generate coverage targets
+    const generateTargets = (w: number, h: number) => {
+      const targets: {x: number, y: number}[] = [];
+      const cols = 6, rows = 5;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          targets.push({
+            x: (c + 0.5) * (w / cols) + (Math.random() - 0.5) * (w / cols) * 0.3,
+            y: (r + 0.5) * (h / rows) + (Math.random() - 0.5) * (h / rows) * 0.3,
+          });
+        }
+      }
+      // Corners and edges
+      targets.push({x: 50, y: 50}, {x: w - 50, y: 50}, {x: 50, y: h - 50}, {x: w - 50, y: h - 50});
+      targets.push({x: w / 2, y: 30}, {x: w / 2, y: h - 30}, {x: 30, y: h / 2}, {x: w - 30, y: h / 2});
+      for (let i = 0; i < 15; i++) targets.push({x: Math.random() * w, y: Math.random() * h});
+      // Shuffle
+      for (let i = targets.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [targets[i], targets[j]] = [targets[j], targets[i]];
+      }
+      return targets;
+    };
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const w = window.innerWidth, h = window.innerHeight;
+      bgCanvas.width = w * dpr; bgCanvas.height = h * dpr;
+      bgCanvas.style.width = `${w}px`; bgCanvas.style.height = `${h}px`;
+      bgCtx.scale(dpr, dpr);
+      snowCanvas.width = w * dpr; snowCanvas.height = h * dpr;
+      snowCanvas.style.width = `${w}px`; snowCanvas.style.height = `${h}px`;
+      snowCtx.scale(dpr, dpr);
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    frostyPhaseRef.current = 'preview';
+    setFrostyPhase('preview');
+    frostyPhaseStartRef.current = performance.now();
+    frostySnowballsRef.current = [];
+    frostySpawnQueueRef.current = [];
+
+    const drawBg = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
+      if (!frostyBgImageRef.current) return;
+      const img = frostyBgImageRef.current;
+      const imgR = img.width / img.height, canR = w / h;
+      let dw, dh, dx, dy;
+      if (canR > imgR) { dw = w; dh = w / imgR; dx = 0; dy = (h - dh) / 2; }
+      else { dh = h; dw = h * imgR; dx = (w - dw) / 2; dy = 0; }
+      ctx.drawImage(img, dx, dy, dw, dh);
+    };
+
+    const drawSnowball = (ctx: CanvasRenderingContext2D, s: typeof frostySnowballsRef.current[0]) => {
+      if (!frostySnowImageRef.current) return;
+      const cx = s.landed ? s.x : s.startX + (s.x - s.startX) * s.progress;
+      const cy = s.landed ? s.y : s.startY + (s.y - s.startY) * s.progress;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(s.rotation);
+      ctx.drawImage(frostySnowImageRef.current, -s.size / 2, -s.size / 2, s.size, s.size);
+      ctx.restore();
+    };
+
+    const spawnAt = (tx: number, ty: number, w: number, h: number) => {
+      const edge = Math.floor(Math.random() * 4);
+      let sx: number, sy: number;
+      if (edge === 0) { sx = tx + (Math.random() - 0.5) * 150; sy = -200; }
+      else if (edge === 1) { sx = w + 200; sy = ty + (Math.random() - 0.5) * 150; }
+      else if (edge === 2) { sx = tx + (Math.random() - 0.5) * 150; sy = h + 200; }
+      else { sx = -200; sy = ty + (Math.random() - 0.5) * 150; }
+      frostySnowballsRef.current.push({
+        x: tx, y: ty, startX: sx, startY: sy,
+        size: 350 + Math.random() * 400, rotation: Math.random() * Math.PI * 2,
+        progress: 0, speed: 0.12 + Math.random() * 0.08, landed: false,
+      });
+    };
+
+    const redrawSnow = () => {
+      snowCtx.clearRect(0, 0, snowCanvas.width, snowCanvas.height);
+      for (const s of frostySnowballsRef.current) drawSnowball(snowCtx, s);
+    };
+
+    const gameLoop = () => {
+      const now = performance.now();
+      const elapsed = now - frostyPhaseStartRef.current;
+      const w = window.innerWidth, h = window.innerHeight;
+
+      // Draw background
+      bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+      drawBg(bgCtx, w, h);
+
+      if (frostyPhaseRef.current === 'preview' && elapsed > 1500) {
+        frostyPhaseRef.current = 'assault';
+        setFrostyPhase('assault');
+        frostyPhaseStartRef.current = now;
+        frostySnowballsRef.current = [];
+        frostySpawnQueueRef.current = generateTargets(w, h);
+        frostyLastSpawnRef.current = now;
+      }
+
+      if (frostyPhaseRef.current === 'assault') {
+        if (frostySpawnQueueRef.current.length > 0 && now - frostyLastSpawnRef.current >= 30) {
+          const t = frostySpawnQueueRef.current.shift()!;
+          spawnAt(t.x, t.y, w, h);
+          frostyLastSpawnRef.current = now;
+        }
+        let allLanded = true;
+        for (const s of frostySnowballsRef.current) {
+          if (!s.landed) {
+            s.progress += s.speed;
+            if (s.progress >= 1) { s.progress = 1; s.landed = true; }
+            else allLanded = false;
+          }
+        }
+        redrawSnow();
+        if (frostySpawnQueueRef.current.length === 0 && allLanded && frostySnowballsRef.current.length > 0) {
+          frostyPhaseRef.current = 'wipe';
+          setFrostyPhase('wipe');
+          frostyPhaseStartRef.current = now;
+          frostyWipeTimerRef.current = 0;
+        }
+      }
+
+      if (frostyPhaseRef.current === 'wipe') {
+        frostyWipeTimerRef.current = elapsed;
+        if (elapsed > 24000) {
+          frostyPhaseRef.current = 'assault';
+          setFrostyPhase('assault');
+          frostyPhaseStartRef.current = now;
+          frostySnowballsRef.current = [];
+          frostySpawnQueueRef.current = generateTargets(w, h);
+          frostyLastSpawnRef.current = now;
+        }
+      }
+
+      frostyAnimationRef.current = requestAnimationFrame(gameLoop);
+    };
+
+    frostyAnimationRef.current = requestAnimationFrame(gameLoop);
+
+    return () => {
+      window.removeEventListener('resize', resize);
+      if (frostyAnimationRef.current) cancelAnimationFrame(frostyAnimationRef.current);
+    };
+  }, [activeGame]);
+
+  // ============================================
+  // FROSTY WINDOW: Wipe handlers
+  // ============================================
+  const handleFrostyWipe = useCallback((x: number, y: number, prevX?: number, prevY?: number) => {
+    const canvas = frostySnowCanvasRef.current;
+    if (!canvas || frostyPhaseRef.current !== 'wipe') return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.globalCompositeOperation = 'destination-out';
+    const brush = 80;
+    if (prevX !== undefined && prevY !== undefined) {
+      const dx = x - prevX, dy = y - prevY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const steps = Math.max(1, Math.floor(dist / 10));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const cx = prevX + dx * t, cy = prevY + dy * t;
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, brush);
+        grad.addColorStop(0, 'rgba(0,0,0,1)');
+        grad.addColorStop(0.5, 'rgba(0,0,0,0.8)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(cx, cy, brush, 0, Math.PI * 2); ctx.fill();
+      }
+    } else {
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, brush);
+      grad.addColorStop(0, 'rgba(0,0,0,1)');
+      grad.addColorStop(0.5, 'rgba(0,0,0,0.8)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(x, y, brush, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }, []);
+
+  const handleFrostyPointerMove = useCallback((e: React.PointerEvent | React.TouchEvent) => {
+    let x: number, y: number;
+    if ('touches' in e) { x = e.touches[0].clientX; y = e.touches[0].clientY; }
+    else { x = e.clientX; y = e.clientY; }
+    const prev = frostyLastPointerRef.current;
+    handleFrostyWipe(x, y, prev?.x, prev?.y);
+    frostyLastPointerRef.current = { x, y };
+  }, [handleFrostyWipe]);
+
+  const handleFrostyPointerDown = useCallback((e: React.PointerEvent | React.TouchEvent) => {
+    let x: number, y: number;
+    if ('touches' in e) { x = e.touches[0].clientX; y = e.touches[0].clientY; }
+    else { x = e.clientX; y = e.clientY; }
+    frostyLastPointerRef.current = { x, y };
+    handleFrostyWipe(x, y);
+  }, [handleFrostyWipe]);
+
+  const handleFrostyPointerUp = useCallback(() => {
+    frostyLastPointerRef.current = null;
+  }, []);
 
   // ============================================
   // SAND PAINTER RENDER LOOP
@@ -1349,6 +1607,88 @@ export default function PatientComfort() {
         </div>
 
         <style jsx global>{`* { cursor: none !important; }`}</style>
+      </div>
+    );
+  }
+
+  // ============================================
+  // RENDER: FROSTY WINDOW GAME
+  // ============================================
+  if (activeGame === 'frosty-window') {
+    return (
+      <div
+        style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          overflow: 'hidden', touchAction: 'none',
+          cursor: frostyPhase === 'wipe' ? 'crosshair' : 'default',
+        }}
+        onPointerMove={handleFrostyPointerMove}
+        onPointerDown={handleFrostyPointerDown}
+        onPointerUp={handleFrostyPointerUp}
+        onPointerLeave={handleFrostyPointerUp}
+        onTouchMove={handleFrostyPointerMove}
+        onTouchStart={handleFrostyPointerDown}
+        onTouchEnd={handleFrostyPointerUp}
+      >
+        <canvas ref={frostyBgCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+        <canvas ref={frostySnowCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+
+        <Link href="/caregiver/monitoring" style={{
+          position: 'absolute', top: '20px', right: '20px', padding: '12px 20px',
+          background: 'rgba(255,255,255,0.95)', borderRadius: '12px', color: '#000',
+          textDecoration: 'none', fontSize: '1rem', fontWeight: 800,
+          border: '2px solid rgba(0,0,0,0.3)', zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+        }}>
+          Monitoring Dashboard
+        </Link>
+
+        {frostyPhase === 'preview' && (
+          <div style={{
+            position: 'absolute', bottom: '100px', left: '50%', transform: 'translateX(-50%)',
+            color: 'white', fontSize: '1.5rem', fontWeight: 600,
+            textShadow: '0 2px 10px rgba(0,0,0,0.5)', zIndex: 100,
+          }}>
+            Look at this beautiful view...
+          </div>
+        )}
+
+        {frostyPhase === 'assault' && (
+          <div style={{
+            position: 'absolute', bottom: '100px', left: '50%', transform: 'translateX(-50%)',
+            color: 'white', fontSize: '1.5rem', fontWeight: 600,
+            textShadow: '0 2px 10px rgba(0,0,0,0.5)', zIndex: 100,
+          }}>
+            ❄️ Snow incoming! ❄️
+          </div>
+        )}
+
+        {frostyPhase === 'wipe' && (
+          <div style={{
+            position: 'absolute', bottom: '100px', left: '50%', transform: 'translateX(-50%)',
+            color: 'white', fontSize: '1.5rem', fontWeight: 600,
+            textShadow: '0 2px 10px rgba(0,0,0,0.5)', zIndex: 100,
+          }}>
+            Wipe the snow away! ✋
+          </div>
+        )}
+
+        <div style={{
+          position: 'absolute', bottom: '20px', left: '20px',
+          color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', zIndex: 100,
+          textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+        }}>
+          {Math.floor(gameSessionDuration / 60)}:{(gameSessionDuration % 60).toString().padStart(2, '0')}
+        </div>
+
+        {frostyPhase === 'wipe' && (
+          <div style={{
+            position: 'absolute', bottom: '20px', right: '20px',
+            color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', zIndex: 100,
+            textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+          }}>
+            Next snow in: {Math.max(0, 24 - Math.floor(frostyWipeTimerRef.current / 1000))}s
+          </div>
+        )}
       </div>
     );
   }
