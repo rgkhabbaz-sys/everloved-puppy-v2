@@ -1382,10 +1382,21 @@ export default function PatientComfort() {
   };
 
   // ============================================
-  // WEBSOCKET EFFECT - FIX: Send start_session immediately (no conditional check)
+  // ============================================
+  // WEBSOCKET EFFECT - PASSIVE VIEW LOGIC
+  // Only connects WebSocket if ?start=true is in URL
   // ============================================
   useEffect(() => {
     if (!mounted || activeGame) return;
+
+    // PASSIVE MODE: Do not connect WebSocket unless ?start=true
+    const urlParams = new URLSearchParams(window.location.search);
+    const shouldStartSession = urlParams.get('start') === 'true';
+    
+    if (!shouldStartSession) {
+      console.log('Passive Mode: No WebSocket connection.');
+      return;
+    }
     
     const ws = new WebSocket('wss://ease-backend-production.up.railway.app');
     wsRef.current = ws;
