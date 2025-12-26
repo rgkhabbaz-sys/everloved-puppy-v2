@@ -162,6 +162,7 @@ export default function MonitoringDashboard() {
       'lifes-ledger': "Life's Ledger",
       'calm-current': 'The Sand-Painter',
       'frosty-window': 'The Frosty Window',
+      'nebula-stir': 'The Nebula Stir',
     };
     return gameNames[gameId] || gameId;
   };
@@ -264,6 +265,18 @@ export default function MonitoringDashboard() {
       color: '#4682B4',
       borderColor: '#36648B',
       image: '/games/switzerland_bg.jpg',
+    },
+    {
+      id: 'nebula-stir',
+      game: 'The Nebula Stir',
+      stage: 'STAGE 3',
+      stageNum: 3,
+      subText: 'Cosmic Fluidity',
+      protocol: 'Branch C: Sensory Immersion',
+      note: 'Stir the cosmic dust. Vigorous movement ignites supernovas.',
+      color: '#4B0082',
+      borderColor: '#2E0854',
+      image: '/games/nebula_bg.jpg',
     },
   ];
 

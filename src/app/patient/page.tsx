@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { NebulaStir } from './NebulaStir';
 import { AnimatedPuppy } from '@/components/AnimatedPuppy';
 
 // ============================================
@@ -113,6 +114,19 @@ export default function PatientComfort() {
   const frostySnowImageRef = useRef<HTMLImageElement | null>(null);
   const frostyAnimationRef = useRef<number>(0);
   const [frostyPhase, setFrostyPhase] = useState<'preview' | 'assault' | 'wipe'>('preview');
+
+  // ============================================
+  // NEBULA STIR STATE
+  // ============================================
+  const nebulaCanvasRef = useRef<HTMLCanvasElement>(null);
+  const nebulaAnimationRef = useRef<number>(0);
+  const nebulaTimeRef = useRef(0);
+  const nebulaPointerRef = useRef({ x: 0.5, y: 0.5, active: false });
+  const nebulaPrevPointerRef = useRef({ x: 0.5, y: 0.5 });
+  const nebulaVelocityFieldRef = useRef<Float32Array | null>(null);
+  const nebulaDensityFieldRef = useRef<Float32Array | null>(null);
+  const nebulaSupernovasRef = useRef<{x: number, y: number, intensity: number, age: number}[]>([]);
+  const nebulaImageRef = useRef<HTMLImageElement | null>(null);
 
   // ============================================
   // ORIGINAL VOICE STATE (UNCHANGED)
@@ -316,7 +330,7 @@ export default function PatientComfort() {
 
   // Game session timer - UPDATED to include frosty-window
   useEffect(() => {
-    if (activeGame !== 'calm-current' && activeGame !== 'bioluminescent-tide' && activeGame !== 'frosty-window') return;
+    if (activeGame !== 'calm-current' && activeGame !== 'bioluminescent-tide' && activeGame !== 'frosty-window' && activeGame !== 'nebula-stir') return;
     const interval = setInterval(() => setGameSessionDuration(prev => prev + 1), 1000);
     return () => clearInterval(interval);
   }, [activeGame]);
@@ -325,7 +339,7 @@ export default function PatientComfort() {
   // FROSTY WINDOW: Load images
   // ============================================
   useEffect(() => {
-    if (activeGame !== 'frosty-window') return;
+    if (activeGame !== 'frosty-window' && activeGame !== 'nebula-stir') return;
     
     const bgImg = new Image();
     const snowImg = new Image();
@@ -507,6 +521,174 @@ export default function PatientComfort() {
   }, [activeGame]);
 
   // ============================================
+  // NEBULA STIR: Load image
+  // ============================================
+  useEffect(() => {
+    if (activeGame !== 'nebula-stir') return;
+    const img = new Image();
+    img.onload = () => { nebulaImageRef.current = img; };
+    img.src = '/games/nebula_bg.jpg';
+    return () => { img.onload = null; };
+  }, [activeGame]);
+
+
+  // ============================================
+  // NEBULA STIR: Game loop - High viscosity fluid with supernova
+  // ============================================
+  useEffect(() => {
+    if (activeGame !== 'nebula-stir') {
+      if (nebulaAnimationRef.current) cancelAnimationFrame(nebulaAnimationRef.current);
+      return;
+    }
+    const canvas = nebulaCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const gridSize = 64;
+    const cellSize = { x: 0, y: 0 };
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio, 2);
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      ctx.scale(dpr, dpr);
+      cellSize.x = window.innerWidth / gridSize;
+      cellSize.y = window.innerHeight / gridSize;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+    const fieldSize = gridSize * gridSize * 2;
+    nebulaVelocityFieldRef.current = new Float32Array(fieldSize);
+    nebulaDensityFieldRef.current = new Float32Array(gridSize * gridSize);
+    for (let i = 0; i < gridSize * gridSize; i++) {
+      nebulaDensityFieldRef.current[i] = 0.3 + Math.random() * 0.4;
+    }
+    nebulaTimeRef.current = 0;
+    nebulaSupernovasRef.current = [];
+    const render = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      nebulaTimeRef.current += 0.016;
+      const hour = new Date().getHours();
+      const isNightMode = hour >= 16 || hour < 8;
+      ctx.clearRect(0, 0, width, height);
+      if (nebulaImageRef.current) {
+        const img = nebulaImageRef.current;
+        const imgR = img.width / img.height, canR = width / height;
+        let dw, dh, dx, dy;
+        if (canR > imgR) { dw = width; dh = width / imgR; dx = 0; dy = (height - dh) / 2; }
+        else { dh = height; dw = height * imgR; dx = (width - dw) / 2; dy = 0; }
+        ctx.drawImage(img, dx, dy, dw, dh);
+      } else {
+        const grad = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, Math.max(width, height) * 0.7);
+        grad.addColorStop(0, '#1a0a2e');
+        grad.addColorStop(0.5, '#0d0520');
+        grad.addColorStop(1, '#050210');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
+      }
+      const velocities = nebulaVelocityFieldRef.current;
+      if (!velocities) { nebulaAnimationRef.current = requestAnimationFrame(render); return; }
+      const pointer = nebulaPointerRef.current;
+      const prevPointer = nebulaPrevPointerRef.current;
+      const pointerVelX = (pointer.x - prevPointer.x) * 10;
+      const pointerVelY = (pointer.y - prevPointer.y) * 10;
+      const pointerSpeed = Math.sqrt(pointerVelX * pointerVelX + pointerVelY * pointerVelY);
+      if (pointer.active && pointerSpeed > 0.01) {
+        const gridX = Math.floor(pointer.x * gridSize);
+        const gridY = Math.floor(pointer.y * gridSize);
+        const radius = 5;
+        for (let dy = -radius; dy <= radius; dy++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            const gx = gridX + dx;
+            const gy = gridY + dy;
+            if (gx >= 0 && gx < gridSize && gy >= 0 && gy < gridSize) {
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist <= radius) {
+                const falloff = 1 - dist / radius;
+                const idx = (gy * gridSize + gx) * 2;
+                velocities[idx] += pointerVelX * falloff * 0.3;
+                velocities[idx + 1] += pointerVelY * falloff * 0.3;
+              }
+            }
+          }
+        }
+        if (pointerSpeed > 0.15) {
+          const supernovaChance = (pointerSpeed - 0.15) * 2;
+          if (Math.random() < supernovaChance * 0.1) {
+            nebulaSupernovasRef.current.push({ x: pointer.x * width, y: pointer.y * height, intensity: Math.min(1, pointerSpeed * 3), age: 0 });
+          }
+        }
+      }
+      for (let i = 0; i < velocities.length; i++) { velocities[i] *= 0.985; }
+      ctx.globalCompositeOperation = 'lighter';
+      for (let gy = 0; gy < gridSize; gy++) {
+        for (let gx = 0; gx < gridSize; gx++) {
+          const idx = (gy * gridSize + gx) * 2;
+          const vx = velocities[idx];
+          const vy = velocities[idx + 1];
+          const speed = Math.sqrt(vx * vx + vy * vy);
+          if (speed > 0.001) {
+            const x = (gx + 0.5) * cellSize.x;
+            const y = (gy + 0.5) * cellSize.y;
+            const size = 20 + speed * 100;
+            const alpha = Math.min(0.4, speed * 2);
+            const colorPhase = (gx + gy + nebulaTimeRef.current * 10) % 30;
+            let r, g, b;
+            if (colorPhase < 10) { r = 138; g = 43; b = isNightMode ? 0 : 226; }
+            else if (colorPhase < 20) { r = 75; g = 0; b = isNightMode ? 0 : 130; }
+            else { r = 255; g = 215; b = 0; }
+            const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+            gradient.addColorStop(0, 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')');
+            gradient.addColorStop(0.5, 'rgba(' + r + ',' + g + ',' + b + ',' + (alpha * 0.3) + ')');
+            gradient.addColorStop(1, 'transparent');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+      for (let i = nebulaSupernovasRef.current.length - 1; i >= 0; i--) {
+        const sn = nebulaSupernovasRef.current[i];
+        sn.age += 0.016;
+        if (sn.age > 2) { nebulaSupernovasRef.current.splice(i, 1); continue; }
+        let scale, alpha;
+        if (sn.age < 0.3) { scale = (sn.age / 0.3) * 150 * sn.intensity; alpha = sn.age / 0.3; }
+        else if (sn.age < 0.5) { scale = 150 * sn.intensity; alpha = 1; }
+        else { scale = 150 * sn.intensity + (sn.age - 0.5) * 50; alpha = 1 - (sn.age - 0.5) / 1.5; }
+        const coreGrad = ctx.createRadialGradient(sn.x, sn.y, 0, sn.x, sn.y, scale);
+        coreGrad.addColorStop(0, 'rgba(255,255,255,' + alpha + ')');
+        coreGrad.addColorStop(0.2, 'rgba(255,200,100,' + (alpha * 0.8) + ')');
+        coreGrad.addColorStop(0.5, 'rgba(255,100,50,' + (alpha * 0.4) + ')');
+        coreGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = coreGrad;
+        ctx.beginPath();
+        ctx.arc(sn.x, sn.y, scale, 0, Math.PI * 2);
+        ctx.fill();
+        if (sn.age < 0.8) {
+          ctx.strokeStyle = 'rgba(255,255,255,' + (alpha * 0.5) + ')';
+          ctx.lineWidth = 2;
+          for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+            ctx.beginPath();
+            ctx.moveTo(sn.x, sn.y);
+            ctx.lineTo(sn.x + Math.cos(angle) * scale * 1.5, sn.y + Math.sin(angle) * scale * 1.5);
+            ctx.stroke();
+          }
+        }
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      nebulaPrevPointerRef.current = { x: pointer.x, y: pointer.y };
+      nebulaAnimationRef.current = requestAnimationFrame(render);
+    };
+    nebulaAnimationRef.current = requestAnimationFrame(render);
+    return () => {
+      window.removeEventListener('resize', resize);
+      if (nebulaAnimationRef.current) cancelAnimationFrame(nebulaAnimationRef.current);
+    };
+  }, [activeGame]);
+  // ============================================
   // FROSTY WINDOW: Wipe handlers
   // ============================================
   const handleFrostyWipe = useCallback((x: number, y: number, prevX?: number, prevY?: number) => {
@@ -562,6 +744,29 @@ export default function PatientComfort() {
     frostyLastPointerRef.current = null;
   }, []);
 
+
+  // ============================================
+  // NEBULA STIR: Pointer handlers
+  // ============================================
+  const handleNebulaPointerMove = useCallback((e: React.PointerEvent | React.TouchEvent) => {
+    let clientX: number, clientY: number;
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    nebulaPointerRef.current = {
+      x: clientX / window.innerWidth,
+      y: clientY / window.innerHeight,
+      active: true,
+    };
+  }, []);
+
+  const handleNebulaPointerLeave = useCallback(() => {
+    nebulaPointerRef.current.active = false;
+  }, []);
   // ============================================
   // SAND PAINTER RENDER LOOP
   // ============================================
@@ -1620,6 +1825,14 @@ export default function PatientComfort() {
         <style jsx global>{`* { cursor: none !important; }`}</style>
       </div>
     );
+  }
+
+
+  // ============================================
+  // RENDER: NEBULA STIR GAME
+  // ============================================
+  if (activeGame === 'nebula-stir') {
+    return <NebulaStir gameSessionDuration={gameSessionDuration} />;
   }
 
   // ============================================
