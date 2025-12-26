@@ -290,6 +290,18 @@ export default function MonitoringDashboard() {
       borderColor: '#8A847C',
       image: '/games/hidden_statue_thumb.jpg',
     },
+    {
+      id: 'magic-meadow',
+      game: 'Magic Meadow',
+      stage: 'STAGE 3',
+      stageNum: 3,
+      subText: 'Creative Reveal',
+      protocol: 'Branch C: Sensory Immersion',
+      note: 'Hover or touch to color in the black-and-white sketch, revealing a beautiful meadow painting. A soothing, endless loop of creation.',
+      color: '#7A9B6D',
+      borderColor: '#5A7B4D',
+      image: '/games/magic_meadow_thumb.jpg',
+    },
   ];
 
   const renderGameCard = (intervention: typeof interventions[0]) => {

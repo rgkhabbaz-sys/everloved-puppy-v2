@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { NebulaStir } from './NebulaStir';
 import { HiddenStatue } from './HiddenStatue';
+import { MagicMeadow } from './MagicMeadow';
 import { AnimatedPuppy } from '@/components/AnimatedPuppy';
 
 // ============================================
@@ -1841,6 +1842,13 @@ export default function PatientComfort() {
   // ============================================
   if (activeGame === 'hidden-statue') {
     return <HiddenStatue gameSessionDuration={gameSessionDuration} />;
+  }
+
+  // ============================================
+  // RENDER: MAGIC MEADOW GAME
+  // ============================================
+  if (activeGame === 'magic-meadow') {
+    return <MagicMeadow gameSessionDuration={gameSessionDuration} />;
   }
 
   // ============================================
