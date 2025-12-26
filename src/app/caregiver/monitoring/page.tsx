@@ -278,6 +278,18 @@ export default function MonitoringDashboard() {
       borderColor: '#2E0854',
       image: '/games/nebula_bg.jpg',
     },
+    {
+      id: 'hidden-statue',
+      game: 'The Hidden Statue',
+      stage: 'STAGE 3',
+      stageNum: 3,
+      subText: 'Gentle Discovery',
+      protocol: 'Branch C: Sensory Immersion',
+      note: 'Hover to gently polish the marble slab, slowly revealing the statue underneath. A soothing, error-free experience.',
+      color: '#B0A99F',
+      borderColor: '#8A847C',
+      image: '/games/hidden_statue_thumb.jpg',
+    },
   ];
 
   const renderGameCard = (intervention: typeof interventions[0]) => {

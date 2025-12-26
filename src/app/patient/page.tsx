@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { NebulaStir } from './NebulaStir';
+import { HiddenStatue } from './HiddenStatue';
 import { AnimatedPuppy } from '@/components/AnimatedPuppy';
 
 // ============================================
@@ -78,7 +79,7 @@ export default function PatientComfort() {
   const [gameSessionDuration, setGameSessionDuration] = useState(0);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [particleCount, setParticleCount] = useState(1500);
-  
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tideCanvasRef = useRef<HTMLCanvasElement>(null);
   const gameAnimationRef = useRef<number>(0);
@@ -91,11 +92,11 @@ export default function PatientComfort() {
   const gameAudioContextRef = useRef<AudioContext | null>(null);
   const oscillatorsRef = useRef<OscillatorNode[]>([]);
   const gainNodesRef = useRef<GainNode[]>([]);
-  
+
   // Bioluminescent Tide state
-  const tidePlanktonRef = useRef<{x: number, y: number, brightness: number, targetBrightness: number, phase: number}[]>([]);
+  const tidePlanktonRef = useRef<{ x: number, y: number, brightness: number, targetBrightness: number, phase: number }[]>([]);
   const tideTimeRef = useRef(0);
-  const pointerHistoryRef = useRef<{x: number, y: number, time: number}[]>([]);
+  const pointerHistoryRef = useRef<{ x: number, y: number, time: number }[]>([]);
   const dolphinsRef = useRef<Dolphin[]>([]);
 
   // ============================================
@@ -105,11 +106,11 @@ export default function PatientComfort() {
   const frostySnowCanvasRef = useRef<HTMLCanvasElement>(null);
   const frostyPhaseRef = useRef<'preview' | 'assault' | 'wipe'>('preview');
   const frostyPhaseStartRef = useRef<number>(0);
-  const frostySnowballsRef = useRef<{x: number, y: number, size: number, rotation: number, progress: number, speed: number, landed: boolean, startX: number, startY: number}[]>([]);
-  const frostySpawnQueueRef = useRef<{x: number, y: number}[]>([]);
+  const frostySnowballsRef = useRef<{ x: number, y: number, size: number, rotation: number, progress: number, speed: number, landed: boolean, startX: number, startY: number }[]>([]);
+  const frostySpawnQueueRef = useRef<{ x: number, y: number }[]>([]);
   const frostyLastSpawnRef = useRef<number>(0);
   const frostyWipeTimerRef = useRef<number>(0);
-  const frostyLastPointerRef = useRef<{x: number, y: number} | null>(null);
+  const frostyLastPointerRef = useRef<{ x: number, y: number } | null>(null);
   const frostyBgImageRef = useRef<HTMLImageElement | null>(null);
   const frostySnowImageRef = useRef<HTMLImageElement | null>(null);
   const frostyAnimationRef = useRef<number>(0);
@@ -125,7 +126,7 @@ export default function PatientComfort() {
   const nebulaPrevPointerRef = useRef({ x: 0.5, y: 0.5 });
   const nebulaVelocityFieldRef = useRef<Float32Array | null>(null);
   const nebulaDensityFieldRef = useRef<Float32Array | null>(null);
-  const nebulaSupernovasRef = useRef<{x: number, y: number, intensity: number, age: number}[]>([]);
+  const nebulaSupernovasRef = useRef<{ x: number, y: number, intensity: number, age: number }[]>([]);
   const nebulaImageRef = useRef<HTMLImageElement | null>(null);
 
   // ============================================
@@ -140,7 +141,7 @@ export default function PatientComfort() {
   const [failCount, setFailCount] = useState(0);
   const [comfortPhotos, setComfortPhotos] = useState<string[]>([]);
   const [killSwitchActive, setKillSwitchActive] = useState(false);
-  
+
   const [currentTier, setCurrentTier] = useState(1);
   const [earPerk, setEarPerk] = useState(false);
   const [audioAmplitude, setAudioAmplitude] = useState(0);
@@ -150,7 +151,7 @@ export default function PatientComfort() {
   const [showBreathPacer, setShowBreathPacer] = useState(false);
   const [breathPacerScale, setBreathPacerScale] = useState(1);
   const [breathCycleRate, setBreathCycleRate] = useState(20);
-  
+
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -210,7 +211,7 @@ export default function PatientComfort() {
   }, []);
 
   const initTidePlankton = useCallback(() => {
-    const plankton: {x: number, y: number, brightness: number, targetBrightness: number, phase: number}[] = [];
+    const plankton: { x: number, y: number, brightness: number, targetBrightness: number, phase: number }[] = [];
     const count = 3000;
     for (let i = 0; i < count; i++) {
       plankton.push({
@@ -222,7 +223,7 @@ export default function PatientComfort() {
       });
     }
     tidePlanktonRef.current = plankton;
-    
+
     // Initialize 3 dolphins at different depths
     dolphinsRef.current = [
       { x: -0.2, y: 0.3, depth: 0.6, speed: 0.008, phase: 0, direction: 1 },
@@ -256,7 +257,7 @@ export default function PatientComfort() {
   }, []);
 
   const cleanupGameAudio = useCallback(() => {
-    oscillatorsRef.current.forEach(osc => { try { osc.stop(); } catch (e) {} });
+    oscillatorsRef.current.forEach(osc => { try { osc.stop(); } catch (e) { } });
     if (gameAudioContextRef.current) gameAudioContextRef.current.close();
     gameAudioContextRef.current = null;
     oscillatorsRef.current = [];
@@ -340,16 +341,16 @@ export default function PatientComfort() {
   // ============================================
   useEffect(() => {
     if (activeGame !== 'frosty-window' && activeGame !== 'nebula-stir') return;
-    
+
     const bgImg = new Image();
     const snowImg = new Image();
-    
+
     bgImg.onload = () => { frostyBgImageRef.current = bgImg; };
     snowImg.onload = () => { frostySnowImageRef.current = snowImg; };
-    
+
     bgImg.src = '/games/switzerland_bg.jpg';
     snowImg.src = '/games/snowball.png';
-    
+
     return () => {
       bgImg.onload = null;
       snowImg.onload = null;
@@ -375,7 +376,7 @@ export default function PatientComfort() {
 
     // Generate coverage targets
     const generateTargets = (w: number, h: number) => {
-      const targets: {x: number, y: number}[] = [];
+      const targets: { x: number, y: number }[] = [];
       const cols = 6, rows = 5;
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
@@ -386,9 +387,9 @@ export default function PatientComfort() {
         }
       }
       // Corners and edges
-      targets.push({x: 50, y: 50}, {x: w - 50, y: 50}, {x: 50, y: h - 50}, {x: w - 50, y: h - 50});
-      targets.push({x: w / 2, y: 30}, {x: w / 2, y: h - 30}, {x: 30, y: h / 2}, {x: w - 30, y: h / 2});
-      for (let i = 0; i < 15; i++) targets.push({x: Math.random() * w, y: Math.random() * h});
+      targets.push({ x: 50, y: 50 }, { x: w - 50, y: 50 }, { x: 50, y: h - 50 }, { x: w - 50, y: h - 50 });
+      targets.push({ x: w / 2, y: 30 }, { x: w / 2, y: h - 30 }, { x: 30, y: h / 2 }, { x: w - 30, y: h / 2 });
+      for (let i = 0; i < 15; i++) targets.push({ x: Math.random() * w, y: Math.random() * h });
       // Shuffle
       for (let i = targets.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -581,7 +582,7 @@ export default function PatientComfort() {
         else { dh = height; dw = height * imgR; dx = (width - dw) / 2; dy = 0; }
         ctx.drawImage(img, dx, dy, dw, dh);
       } else {
-        const grad = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, Math.max(width, height) * 0.7);
+        const grad = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) * 0.7);
         grad.addColorStop(0, '#1a0a2e');
         grad.addColorStop(0.5, '#0d0520');
         grad.addColorStop(1, '#050210');
@@ -893,7 +894,7 @@ export default function PatientComfort() {
 
       if (pointer.active) {
         const glow = palette.glow;
-        ctx.fillStyle = `rgba(${Math.floor(glow[0]*255)}, ${Math.floor(glow[1]*255)}, ${Math.floor(glow[2]*255)}, 0.15)`;
+        ctx.fillStyle = `rgba(${Math.floor(glow[0] * 255)}, ${Math.floor(glow[1] * 255)}, ${Math.floor(glow[2] * 255)}, 0.15)`;
         ctx.beginPath();
         ctx.arc(pointer.x * width, pointer.y * height, 50, 0, Math.PI * 2);
         ctx.fill();
@@ -963,7 +964,7 @@ export default function PatientComfort() {
         const hx = width * (0.3 + Math.sin(tideTimeRef.current * 0.1 + i) * 0.2);
         const hy = height * (0.3 + Math.cos(tideTimeRef.current * 0.08 + i * 2) * 0.2);
         const hGradient = ctx.createRadialGradient(hx, hy, 0, hx, hy, 300);
-        hGradient.addColorStop(0, `rgba(${Math.floor(palette.secondary[0]*255)}, ${Math.floor(palette.secondary[1]*255)}, ${Math.floor(palette.secondary[2]*255)}, 0.3)`);
+        hGradient.addColorStop(0, `rgba(${Math.floor(palette.secondary[0] * 255)}, ${Math.floor(palette.secondary[1] * 255)}, ${Math.floor(palette.secondary[2] * 255)}, 0.3)`);
         hGradient.addColorStop(1, 'transparent');
         ctx.fillStyle = hGradient;
         ctx.fillRect(0, 0, width, height);
@@ -979,7 +980,7 @@ export default function PatientComfort() {
       for (const dolphin of dolphins) {
         dolphin.x += dolphin.speed * dolphin.direction * deltaTime * 10;
         dolphin.y += Math.sin(tideTimeRef.current * 0.5 + dolphin.phase) * 0.001;
-        
+
         // Wrap around
         if (dolphin.direction > 0 && dolphin.x > 1.3) {
           dolphin.x = -0.3;
@@ -993,25 +994,25 @@ export default function PatientComfort() {
       // Update plankton brightness based on pointer proximity (PASSIVE HOVER)
       const plankton = tidePlanktonRef.current;
       const pointer = pointerRef.current;
-      
+
       for (let i = 0; i < plankton.length; i++) {
         const p = plankton[i];
-        
+
         // Base breathing brightness
         let targetBrightness = 0.02 + Math.sin(tideTimeRef.current * 0.5 + p.phase) * 0.01;
-        
+
         // PASSIVE HOVER: Check proximity to current pointer (no click needed)
         if (pointer.active) {
           const dx = p.x - pointer.x;
           const dy = p.y - pointer.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          
+
           if (dist < 0.15) {
             const proximity = 1 - dist / 0.15;
             targetBrightness += proximity * 0.7;
           }
         }
-        
+
         // Check proximity to pointer trail (3-5 second dissipation)
         for (const trail of pointerHistoryRef.current) {
           const dx = p.x - trail.x;
@@ -1019,48 +1020,48 @@ export default function PatientComfort() {
           const dist = Math.sqrt(dx * dx + dy * dy);
           const age = currentTime - trail.time;
           const fadeOut = Math.max(0, 1 - age / 5); // 5 second fade
-          
+
           if (dist < 0.12 && fadeOut > 0) {
             const proximity = (1 - dist / 0.12) * fadeOut;
             targetBrightness += proximity * 0.5;
           }
         }
-        
+
         // Check proximity to dolphins - they light up plankton as they pass
         for (const dolphin of dolphins) {
           const dx = p.x - dolphin.x;
           const dy = p.y - dolphin.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          
+
           if (dist < 0.1) {
             const proximity = 1 - dist / 0.1;
             targetBrightness += proximity * 0.4 * dolphin.depth;
           }
         }
-        
+
         p.targetBrightness = Math.min(1, targetBrightness);
-        
+
         // GLACIAL: Very slow brightness transition
         p.brightness += (p.targetBrightness - p.brightness) * 0.015;
-        
+
         // Only draw if visible
         if (p.brightness > 0.01) {
           const screenX = p.x * width;
           const screenY = p.y * height;
           const size = 2 + p.brightness * 4;
           const alpha = Math.min(0.9, p.brightness);
-          
+
           // Night mode: ensure zero blue channel
           let r = palette.glow[0];
           let g = palette.glow[1];
           let b = isNightMode ? 0 : palette.glow[2]; // Zero blue at night
-          
+
           ctx.globalCompositeOperation = 'lighter';
           const glowGradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, size * 3);
-          glowGradient.addColorStop(0, `rgba(${Math.floor(r*255)}, ${Math.floor(g*255)}, ${Math.floor(b*255)}, ${alpha})`);
-          glowGradient.addColorStop(0.5, `rgba(${Math.floor(r*255)}, ${Math.floor(g*255)}, ${Math.floor(b*255)}, ${alpha * 0.3})`);
+          glowGradient.addColorStop(0, `rgba(${Math.floor(r * 255)}, ${Math.floor(g * 255)}, ${Math.floor(b * 255)}, ${alpha})`);
+          glowGradient.addColorStop(0.5, `rgba(${Math.floor(r * 255)}, ${Math.floor(g * 255)}, ${Math.floor(b * 255)}, ${alpha * 0.3})`);
           glowGradient.addColorStop(1, 'transparent');
-          
+
           ctx.fillStyle = glowGradient;
           ctx.beginPath();
           ctx.arc(screenX, screenY, size * 3, 0, Math.PI * 2);
@@ -1074,7 +1075,7 @@ export default function PatientComfort() {
         const dx = dolphin.x * width;
         const dy = dolphin.y * height;
         const scale = 40 + dolphin.depth * 60;
-        
+
         // Check if dolphin is near active plankton for glow effect
         let dolphinGlow = 0;
         for (const p of plankton) {
@@ -1086,22 +1087,22 @@ export default function PatientComfort() {
           }
         }
         dolphinGlow = Math.min(0.5, dolphinGlow);
-        
+
         ctx.save();
         ctx.translate(dx, dy);
         ctx.scale(dolphin.direction, 1);
-        
+
         // Soft blur effect
         ctx.filter = `blur(${8 - dolphin.depth * 4}px)`;
         ctx.globalAlpha = 0.15 + dolphin.depth * 0.15 + dolphinGlow;
-        
+
         // Dolphin color - catches glow
         let dolphinR = 100 + dolphinGlow * palette.glow[0] * 155;
         let dolphinG = 180 + dolphinGlow * palette.glow[1] * 75;
         let dolphinB = isNightMode ? 0 : (200 + dolphinGlow * palette.glow[2] * 55);
-        
+
         ctx.fillStyle = `rgb(${Math.floor(dolphinR)}, ${Math.floor(dolphinG)}, ${Math.floor(dolphinB)})`;
-        
+
         // Draw dolphin shape
         ctx.beginPath();
         ctx.moveTo(-scale, 0);
@@ -1110,7 +1111,7 @@ export default function PatientComfort() {
         ctx.quadraticCurveTo(scale * 0.8, scale * 0.2, scale * 0.2, scale * 0.1);
         ctx.quadraticCurveTo(-scale * 0.5, scale * 0.3, -scale, 0);
         ctx.fill();
-        
+
         // Tail fin
         ctx.beginPath();
         ctx.moveTo(-scale, 0);
@@ -1118,13 +1119,13 @@ export default function PatientComfort() {
         ctx.quadraticCurveTo(-scale * 1.1, 0, -scale * 1.2, scale * 0.5);
         ctx.quadraticCurveTo(-scale * 1.3, scale * 0.3, -scale, 0);
         ctx.fill();
-        
+
         // Dorsal fin
         ctx.beginPath();
         ctx.moveTo(0, -scale * 0.15);
         ctx.quadraticCurveTo(scale * 0.1, -scale * 0.5, scale * 0.3, -scale * 0.15);
         ctx.fill();
-        
+
         ctx.restore();
       }
 
@@ -1155,13 +1156,13 @@ export default function PatientComfort() {
     }
     const newX = clientX / window.innerWidth;
     const newY = clientY / window.innerHeight;
-    
+
     pointerRef.current = {
       x: newX,
       y: newY,
       active: true,
     };
-    
+
     // Add to pointer history for trail effect (Bioluminescent Tide)
     if (activeGame === 'bioluminescent-tide') {
       pointerHistoryRef.current.push({
@@ -1188,14 +1189,14 @@ export default function PatientComfort() {
     setMounted(true);
     setCircadianColors(getCircadianColors());
     const interval = setInterval(() => setCircadianColors(getCircadianColors()), 60000);
-    
+
     try {
       const photos = localStorage.getItem('everloved-memory-photos');
       if (photos) setComfortPhotos(JSON.parse(photos));
     } catch (e) {
       console.error('Error loading comfort photos:', e);
     }
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -1213,53 +1214,53 @@ export default function PatientComfort() {
   const showTier2MemoryAnchor = (withMusic: boolean = false) => {
     const photo = getPrimaryPhoto();
     if (!photo) return;
-    
+
     stopBreathPacer();
-    
+
     setMemoryAnchorPhoto(photo);
     setShowMemoryAnchor(true);
     setMemoryAnchorOpacity(0);
-    
+
     if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
-    
+
     let progress = 0;
     const duration = 4000;
     const steps = 60;
     const stepDuration = duration / steps;
-    
+
     fadeIntervalRef.current = setInterval(() => {
       progress += 1 / steps;
       const eased = progress * progress * (3 - 2 * progress);
       setMemoryAnchorOpacity(eased);
-      
+
       if (progress >= 1) {
         if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
         setMemoryAnchorOpacity(1);
       }
     }, stepDuration);
-    
+
     if (withMusic) {
       startIsoMusicIntervention();
     }
-    
+
     saveToLog('system', 'Tier 2: Memory anchor displayed');
-    
+
     setTimeout(() => hideTier2MemoryAnchor(), 60000);
   };
 
   const hideTier2MemoryAnchor = () => {
     if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
-    
+
     let progress = 1;
     const duration = 2000;
     const steps = 30;
     const stepDuration = duration / steps;
-    
+
     fadeIntervalRef.current = setInterval(() => {
       progress -= 1 / steps;
       const eased = Math.max(0, progress * progress * (3 - 2 * progress));
       setMemoryAnchorOpacity(eased);
-      
+
       if (progress <= 0) {
         if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
         setShowMemoryAnchor(false);
@@ -1273,14 +1274,14 @@ export default function PatientComfort() {
       const musicData = localStorage.getItem('everloved-music');
       const musicArray = musicData ? JSON.parse(musicData) : [];
       const uploadedMusic = musicArray.length > 0 ? musicArray[0].data : null;
-      
+
       if (uploadedMusic) {
         backgroundMusicRef.current = new Audio(uploadedMusic);
         backgroundMusicRef.current.loop = false;
         backgroundMusicRef.current.volume = 0.3;
         backgroundMusicRef.current.playbackRate = 1.0;
         backgroundMusicRef.current.play().catch(console.error);
-        
+
         let rate = 1.0;
         const rateInterval = setInterval(() => {
           rate = Math.max(0.85, rate - 0.005);
@@ -1302,12 +1303,12 @@ export default function PatientComfort() {
       backgroundMusicRef.current.pause();
       backgroundMusicRef.current = null;
     }
-    
+
     setShowBreathPacer(true);
     setBreathCycleRate(22);
-    
+
     saveToLog('system', 'Tier 3: Breath pacer activated');
-    
+
     let expanding = true;
     breathIntervalRef.current = setInterval(() => {
       setBreathPacerScale(prev => {
@@ -1320,7 +1321,7 @@ export default function PatientComfort() {
         }
       });
     }, 60000 / breathCycleRate / 30);
-    
+
     breathDecelerationRef.current = setInterval(() => {
       setBreathCycleRate(prev => {
         const newRate = Math.max(6, prev - 0.5);
@@ -1342,9 +1343,9 @@ export default function PatientComfort() {
         return newRate;
       });
     }, 5000);
-    
+
     startRhythmicAudio();
-    
+
     setTimeout(() => stopBreathPacer(), 180000);
   };
 
@@ -1360,20 +1361,20 @@ export default function PatientComfort() {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
-      
+
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
       oscillator.frequency.value = 60;
       oscillator.type = 'sine';
       gainNode.gain.value = 0;
-      
+
       oscillator.start();
-      
+
       let pulseInterval = setInterval(() => {
         gainNode.gain.setValueAtTime(0.08, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
       }, 60000 / breathCycleRate / 2);
-      
+
       (window as any).tier3Oscillator = oscillator;
       (window as any).tier3AudioContext = audioContext;
       (window as any).tier3PulseInterval = pulseInterval;
@@ -1393,7 +1394,7 @@ export default function PatientComfort() {
   const handleIntervention = (tier: number, stressIndex: number, state: string, sundowning: boolean) => {
     console.log('Intervention:', { tier, stressIndex, state, sundowning });
     setCurrentTier(tier);
-    
+
     if (tier === 1) {
       saveToLog('system', `Tier 1: Ambient mode (${state})`);
     } else if (tier === 2) {
@@ -1410,12 +1411,12 @@ export default function PatientComfort() {
     setStatusMessage('');
     setShowMemoryAnchor(false);
     stopBreathPacer();
-    
+
     try {
       const musicData = localStorage.getItem('everloved-music');
       const musicArray = musicData ? JSON.parse(musicData) : [];
       const uploadedMusic = musicArray.length > 0 ? musicArray[0].data : null;
-      
+
       if (uploadedMusic) {
         comfortAudioRef.current = new Audio(uploadedMusic);
         comfortAudioRef.current.loop = true;
@@ -1425,14 +1426,14 @@ export default function PatientComfort() {
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
-        
+
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
         oscillator.frequency.value = 528;
         oscillator.type = 'sine';
         gainNode.gain.value = 0.1;
         oscillator.start();
-        
+
         (window as any).killSwitchOscillator = oscillator;
         (window as any).killSwitchAudioContext = audioContext;
       }
@@ -1444,17 +1445,17 @@ export default function PatientComfort() {
   const resetKillSwitch = () => {
     setKillSwitchActive(false);
     setCurrentTier(1);
-    
+
     if (comfortAudioRef.current) {
       comfortAudioRef.current.pause();
       comfortAudioRef.current = null;
     }
-    
+
     if ((window as any).killSwitchOscillator) {
       (window as any).killSwitchOscillator.stop();
       (window as any).killSwitchAudioContext.close();
     }
-    
+
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'reset_kill_switch' }));
     }
@@ -1500,13 +1501,13 @@ export default function PatientComfort() {
       }
       return;
     }
-    
+
     isPlayingQueueRef.current = true;
     setIsPlaying(true);
     const nextAudio = audioQueueRef.current.shift()!;
-    
+
     const audio = new Audio(`data:audio/mp3;base64,${nextAudio}`);
-    
+
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new AudioContext();
@@ -1517,7 +1518,7 @@ export default function PatientComfort() {
       source.connect(analyser);
       analyser.connect(audioContextRef.current.destination);
       analyserRef.current = analyser;
-      
+
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       amplitudeIntervalRef.current = setInterval(() => {
         if (analyserRef.current) {
@@ -1529,7 +1530,7 @@ export default function PatientComfort() {
     } catch (e) {
       console.log('Audio analysis not available');
     }
-    
+
     audio.onended = () => {
       setAudioAmplitude(0);
       playNextInQueue();
@@ -1546,14 +1547,14 @@ export default function PatientComfort() {
 
   const startContinuousAudio = async () => {
     if (killSwitchActive || continuousStreamActive.current) return;
-    
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 } 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 }
       });
       streamRef.current = stream;
       continuousStreamActive.current = true;
-      
+
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
       mediaRecorderRef.current = mediaRecorder;
 
@@ -1575,7 +1576,7 @@ export default function PatientComfort() {
       setStatusMessage('Please allow microphone access.');
     }
   };
-  
+
   const stopContinuousAudio = () => {
     continuousStreamActive.current = false;
     if (mediaRecorderRef.current?.state === 'recording') {
@@ -1597,12 +1598,12 @@ export default function PatientComfort() {
     // PASSIVE MODE: Do not connect WebSocket unless ?start=true
     const urlParams = new URLSearchParams(window.location.search);
     const shouldStartSession = urlParams.get('start') === 'true';
-    
+
     if (!shouldStartSession) {
       console.log('Passive Mode: No WebSocket connection.');
       return;
     }
-    
+
     const ws = new WebSocket('wss://ease-backend-production.up.railway.app');
     wsRef.current = ws;
 
@@ -1617,7 +1618,7 @@ export default function PatientComfort() {
 
     ws.onmessage = async (event) => {
       const data = JSON.parse(event.data);
-      
+
       if (data.type === 'session_started') {
         if (isSessionActive() && !hasAutoStarted.current) {
           hasAutoStarted.current = true;
@@ -1705,10 +1706,10 @@ export default function PatientComfort() {
       hideTier2MemoryAnchor();
       return;
     }
-    
+
     if (showBreathPacer) return;
     if (killSwitchActive) return;
-    
+
     setFailCount(0);
     if (isListening) stopListening();
     else if (!isPlaying && !isProcessing) startContinuousAudio();
@@ -1836,6 +1837,13 @@ export default function PatientComfort() {
   }
 
   // ============================================
+  // RENDER: HIDDEN STATUE GAME
+  // ============================================
+  if (activeGame === 'hidden-statue') {
+    return <HiddenStatue gameSessionDuration={gameSessionDuration} />;
+  }
+
+  // ============================================
   // RENDER: FROSTY WINDOW GAME
   // ============================================
   if (activeGame === 'frosty-window') {
@@ -1933,7 +1941,7 @@ export default function PatientComfort() {
           background: 'radial-gradient(circle, rgba(100,149,237,0.6) 0%, rgba(100,149,237,0.1) 70%)',
           animation: 'pulse 4s ease-in-out infinite', marginBottom: '60px',
         }} />
-        
+
         <p style={{
           color: '#a0c4ff', fontSize: '1.5rem', textAlign: 'center',
           maxWidth: '400px', lineHeight: 1.8, fontWeight: 300,
@@ -1969,13 +1977,13 @@ export default function PatientComfort() {
   // ============================================
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      <Link 
-        href="/caregiver/monitoring" 
-        style={{ 
+      <Link
+        href="/caregiver/monitoring"
+        style={{
           position: 'absolute', top: '16px', right: '16px', zIndex: 10,
-          padding: '10px 20px', borderRadius: '20px', 
-          background: uiColors.cardBg, color: uiColors.textMuted, 
-          fontWeight: 500, fontSize: '0.85rem', textDecoration: 'none', 
+          padding: '10px 20px', borderRadius: '20px',
+          background: uiColors.cardBg, color: uiColors.textMuted,
+          fontWeight: 500, fontSize: '0.85rem', textDecoration: 'none',
           border: '1px solid ' + uiColors.cardBorder, backdropFilter: 'blur(10px)',
         }}
       >
@@ -2016,7 +2024,7 @@ export default function PatientComfort() {
               boxShadow: `0 10px 40px rgba(0,0,0,${0.15 * memoryAnchorOpacity})`,
               border: "4px solid rgba(255,255,255,0.3)", animation: "photoBreath 4s ease-in-out infinite",
             }}>
-              <img src={memoryAnchorPhoto} alt="Memory" style={{ 
+              <img src={memoryAnchorPhoto} alt="Memory" style={{
                 width: '100%', height: 'auto', maxHeight: '50vh', objectFit: 'contain', display: 'block',
               }} />
             </div>
