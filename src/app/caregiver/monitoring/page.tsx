@@ -152,8 +152,15 @@ export default function MonitoringDashboard() {
   };
 
   const handleGameSelect = (gameId: string) => {
-    if (activeGame) return;
-    setSelectedGame(selectedGame === gameId ? null : gameId);
+    // Click on card = immediately start game and navigate
+    const startTime = Date.now();
+    setActiveGame(gameId);
+    setSelectedGame(gameId);
+    setGameStartTime(startTime);
+    setGameTimer(0);
+    localStorage.setItem('everloved-active-game', gameId);
+    localStorage.setItem('everloved-game-start-time', startTime.toString());
+    router.push('/patient');
   };
 
   const getGameName = (gameId: string) => {
@@ -305,34 +312,16 @@ export default function MonitoringDashboard() {
   ];
 
   const renderGameCard = (intervention: typeof interventions[0]) => {
-    const isSelected = selectedGame === intervention.id;
-    const isActive = activeGame === intervention.id;
-    const isDisabled = activeGame !== null && activeGame !== intervention.id;
-
     const cardStyle: React.CSSProperties = {
       height: '320px',
-      background: isActive 
-        ? `linear-gradient(145deg, ${intervention.color}30, ${intervention.color}20)`
-        : isSelected 
-          ? `linear-gradient(145deg, ${intervention.color}25, ${intervention.color}15)`
-          : `linear-gradient(145deg, ${intervention.color}15, ${intervention.color}08)`,
-      border: isActive 
-        ? `3px solid ${intervention.color}`
-        : isSelected 
-          ? `3px solid ${intervention.borderColor}`
-          : `2px solid ${intervention.borderColor}40`,
+      background: `linear-gradient(145deg, ${intervention.color}15, ${intervention.color}08)`,
+      border: `2px solid ${intervention.borderColor}40`,
       borderRadius: '16px',
       padding: '0',
-      cursor: isDisabled ? 'not-allowed' : 'pointer',
+      cursor: 'pointer',
       textAlign: 'left',
       transition: 'all 0.2s ease',
       overflow: 'hidden',
-      opacity: isDisabled ? 0.5 : 1,
-      boxShadow: isActive 
-        ? `0 0 20px ${intervention.color}50`
-        : isSelected 
-          ? `0 4px 16px ${intervention.color}30`
-          : 'none',
       display: 'flex',
       flexDirection: 'column',
       textDecoration: 'none',
@@ -341,14 +330,6 @@ export default function MonitoringDashboard() {
 
     const cardContent = (
       <>
-        {isActive && (
-          <div style={{
-            background: intervention.color, color: '#fff', padding: '6px 12px',
-            fontSize: '0.75rem', fontWeight: 700, textAlign: 'center', letterSpacing: '1px',
-          }}>
-            🎮 GAME IN PROGRESS
-          </div>
-        )}
         <div style={{
           width: '100%', height: '140px', minHeight: '140px', position: 'relative',
           background: intervention.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -381,7 +362,6 @@ export default function MonitoringDashboard() {
       <button
         key={intervention.id}
         onClick={() => handleGameSelect(intervention.id)}
-        disabled={isDisabled}
         style={cardStyle}
       >
         {cardContent}
@@ -579,52 +559,6 @@ export default function MonitoringDashboard() {
           <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '20px' }}>
             Select a therapeutic game matched to {patientName}&apos;s current cognitive stage
           </p>
-
-          <div style={{ 
-            display: 'flex', 
-            gap: '16px',
-            marginBottom: '24px',
-            paddingBottom: '20px',
-            borderBottom: `1px solid ${colors.textMuted}20`,
-          }}>
-            <button
-              onClick={() => selectedGame && handleStartGame(selectedGame)}
-              disabled={!selectedGame || activeGame !== null}
-              style={{
-                flex: 1,
-                background: selectedGame && !activeGame ? colors.success : '#E0E0E0',
-                color: selectedGame && !activeGame ? '#fff' : '#999',
-                border: 'none',
-                padding: '16px 24px',
-                borderRadius: '12px',
-                fontSize: '1.1rem',
-                fontWeight: 600,
-                cursor: selectedGame && !activeGame ? 'pointer' : 'not-allowed',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              ▶️ Start Game
-            </button>
-            <button
-              onClick={() => activeGame && handleEndGame(activeGame)}
-              disabled={!activeGame}
-              style={{
-                flex: 1,
-                background: activeGame ? colors.danger : '#E0E0E0',
-                color: activeGame ? '#fff' : '#999',
-                border: 'none',
-                padding: '16px 24px',
-                borderRadius: '12px',
-                fontSize: '1.1rem',
-                fontWeight: 600,
-                cursor: activeGame ? 'pointer' : 'not-allowed',
-                transition: 'all 0.2s ease',
-                animation: activeGame ? 'pulse 2s infinite' : 'none',
-              }}
-            >
-              ⏹️ End Game
-            </button>
-          </div>
 
           <div style={{
             display: 'grid',

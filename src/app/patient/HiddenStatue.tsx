@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import Link from 'next/link';
 
 interface HiddenStatueProps {
   gameSessionDuration: number;
+  onEndGame?: () => void;
 }
 
-export function HiddenStatue({ gameSessionDuration }: HiddenStatueProps) {
+export function HiddenStatue({ gameSessionDuration, onEndGame }: HiddenStatueProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const revealMaskRef = useRef<Float32Array | null>(null);
@@ -287,15 +287,16 @@ export function HiddenStatue({ gameSessionDuration }: HiddenStatueProps) {
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none', cursor: 'none' }}
       />
 
-      {/* Dashboard link */}
-      <Link href="/caregiver/monitoring" style={{
+      {/* Dashboard button */}
+      <button onClick={onEndGame} style={{
         position: 'absolute', top: '20px', right: '20px', padding: '12px 20px',
         background: 'rgba(255,255,255,0.95)', borderRadius: '12px', color: '#000',
-        textDecoration: 'none', fontSize: '1rem', fontWeight: 800,
+        fontSize: '1rem', fontWeight: 800,
         border: '2px solid rgba(0,0,0,0.3)', zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+        cursor: 'pointer',
       }}>
         Monitoring Dashboard
-      </Link>
+      </button>
 
       {/* Instruction - left side */}
       <div style={{

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { NebulaStir } from './NebulaStir';
 import { HiddenStatue } from './HiddenStatue';
@@ -71,6 +72,8 @@ interface Dolphin {
 }
 
 export default function PatientComfort() {
+  const router = useRouter();
+  
   // ============================================
   // GAME STATE
   // ============================================
@@ -80,6 +83,51 @@ export default function PatientComfort() {
   const [gameSessionDuration, setGameSessionDuration] = useState(0);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [particleCount, setParticleCount] = useState(1500);
+  const gameStartTimeRef = useRef<number | null>(null);
+
+  // ============================================
+  // HANDLE END GAME - Log duration and navigate back
+  // ============================================
+  const handleEndGame = useCallback(() => {
+    const startTimeStr = localStorage.getItem('everloved-game-start-time');
+    const gameId = localStorage.getItem('everloved-active-game');
+    
+    if (startTimeStr && gameId) {
+      const startTime = parseInt(startTimeStr, 10);
+      const duration = Math.floor((Date.now() - startTime) / 1000);
+      
+      // Get game name (matches intervention IDs from monitoring page)
+      const gameNames: Record<string, string> = {
+        'calm-current': 'The Sand-Painter',
+        'bioluminescent-tide': 'Bioluminescent Tide',
+        'nebula-stir': 'Nebula Stir',
+        'hidden-statue': 'The Hidden Statue',
+        'magic-meadow': 'Magic Meadow',
+        'frosty-window': 'The Frosty Window',
+        'infinite-weaver': 'Infinite Weaver',
+      };
+      const gameName = gameNames[gameId] || gameId;
+      
+      // Log to game log only (not conversation log - that's for puppy interactions)
+      const existingGameLog = localStorage.getItem('everloved-game-log');
+      const gameLog = existingGameLog ? JSON.parse(existingGameLog) : [];
+      gameLog.push({
+        gameName: gameName,
+        gameId: gameId,
+        duration: duration,
+        timestamp: new Date().toISOString(),
+      });
+      localStorage.setItem('everloved-game-log', JSON.stringify(gameLog));
+    }
+    
+    // Clear active game
+    localStorage.removeItem('everloved-active-game');
+    localStorage.removeItem('everloved-game-start-time');
+    setActiveGame(null);
+    
+    // Navigate back to dashboard
+    router.push('/caregiver/monitoring');
+  }, [router]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tideCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1737,14 +1785,15 @@ export default function PatientComfort() {
       >
         <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
 
-        <Link href="/caregiver/monitoring" style={{
+        <button onClick={handleEndGame} style={{
           position: 'absolute', top: '20px', right: '20px', padding: '12px 20px',
           background: 'rgba(255,255,255,0.95)', borderRadius: '12px', color: '#000',
-          textDecoration: 'none', fontSize: '1rem', fontWeight: 800,
+          fontSize: '1rem', fontWeight: 800,
           border: '2px solid rgba(0,0,0,0.3)', zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          cursor: 'pointer',
         }}>
           Monitoring Dashboard
-        </Link>
+        </button>
 
         {isSundowning && (
           <div style={{
@@ -1797,14 +1846,15 @@ export default function PatientComfort() {
       >
         <canvas ref={tideCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
 
-        <Link href="/caregiver/monitoring" style={{
+        <button onClick={handleEndGame} style={{
           position: 'absolute', top: '20px', right: '20px', padding: '12px 20px',
           background: 'rgba(255,255,255,0.95)', borderRadius: '12px', color: '#000',
-          textDecoration: 'none', fontSize: '1rem', fontWeight: 800,
+          fontSize: '1rem', fontWeight: 800,
           border: '2px solid rgba(0,0,0,0.3)', zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          cursor: 'pointer',
         }}>
           Monitoring Dashboard
-        </Link>
+        </button>
 
         {isSundowning && (
           <div style={{
@@ -1834,21 +1884,21 @@ export default function PatientComfort() {
   // RENDER: NEBULA STIR GAME
   // ============================================
   if (activeGame === 'nebula-stir') {
-    return <NebulaStir gameSessionDuration={gameSessionDuration} />;
+    return <NebulaStir gameSessionDuration={gameSessionDuration} onEndGame={handleEndGame} />;
   }
 
   // ============================================
   // RENDER: HIDDEN STATUE GAME
   // ============================================
   if (activeGame === 'hidden-statue') {
-    return <HiddenStatue gameSessionDuration={gameSessionDuration} />;
+    return <HiddenStatue gameSessionDuration={gameSessionDuration} onEndGame={handleEndGame} />;
   }
 
   // ============================================
   // RENDER: MAGIC MEADOW GAME
   // ============================================
   if (activeGame === 'magic-meadow') {
-    return <MagicMeadow gameSessionDuration={gameSessionDuration} />;
+    return <MagicMeadow gameSessionDuration={gameSessionDuration} onEndGame={handleEndGame} />;
   }
 
   // ============================================
@@ -1873,14 +1923,15 @@ export default function PatientComfort() {
         <canvas ref={frostyBgCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
         <canvas ref={frostySnowCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
 
-        <Link href="/caregiver/monitoring" style={{
+        <button onClick={handleEndGame} style={{
           position: 'absolute', top: '20px', right: '20px', padding: '12px 20px',
           background: 'rgba(255,255,255,0.95)', borderRadius: '12px', color: '#000',
-          textDecoration: 'none', fontSize: '1rem', fontWeight: 800,
+          fontSize: '1rem', fontWeight: 800,
           border: '2px solid rgba(0,0,0,0.3)', zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          cursor: 'pointer',
         }}>
           Monitoring Dashboard
-        </Link>
+        </button>
 
         {frostyPhase === 'preview' && (
           <div style={{
