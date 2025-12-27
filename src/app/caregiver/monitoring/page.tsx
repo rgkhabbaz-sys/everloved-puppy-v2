@@ -159,7 +159,19 @@ export default function MonitoringDashboard() {
 
   const getGameName = (gameId: string) => {
     const gameNames: Record<string, string> = {
-      'golden-thread': 'The Golden Thread',
+      // Stage 1 - Elite Suite
+      'logic-lattice': 'The Logic Lattice',
+      'rhythmic-mirror': 'Rhythmic Mirror',
+      'perspective-path': 'Perspective Path',
+      'semantic-synthesis': 'Semantic Synthesis',
+      'pattern-pulse': 'Pattern Pulse',
+      // Stage 2 - Cognitive Challenge
+      'color-chemist': 'Color Chemist',
+      'compass-rose': 'The Compass Rose',
+      'gravity-maze': 'The Gravity Maze',
+      'wayback-window': 'The Wayback Window',
+      'time-travelers-trunk': "The Time-Traveler's Trunk",
+      // Stage 3 - Sensory Grounding
       'calm-current': 'The Sand-Painter',
       'frosty-window': 'The Frosty Window',
       'nebula-stir': 'The Nebula Stir',
@@ -204,86 +216,153 @@ export default function MonitoringDashboard() {
     patientBubble: '#E8F4EA',
     companionBubble: '#F0E6D3',
     systemBubble: '#FFE5E5',
-    challengeBlue: '#4A90A4',
-    challengeBlueBorder: '#357A8C',
+    // Stage colors
+    stage1Gold: '#9B7B3D',
+    stage1GoldBorder: '#7A6230',
+    stage2Blue: '#4A90A4',
+    stage2BlueBorder: '#357A8C',
+    stage3Teal: '#4682B4',
+    stage3TealBorder: '#36648B',
   };
 
-  // Stage 1 Game
+  // ============================================
+  // STAGE 1: COGNITIVE MAINTENANCE (ELITE SUITE)
+  // Clickable but patient-side rendering deferred
+  // ============================================
   const stage1Games = [
     {
-      id: 'golden-thread',
-      game: 'The Golden Thread',
+      id: 'logic-lattice',
+      game: 'The Logic Lattice',
       stage: 'STAGE 1',
       stageNum: 1,
-      subText: 'Ambient Engagement',
-      protocol: 'Routine Anchoring',
-      note: 'Use for active daily interaction to maintain cognitive threads.',
-      color: '#DAA520',
-      borderColor: '#B8860B',
-      image: '/games/golden-thread.png',
+      subText: 'Executive Logic',
+      protocol: 'Cognitive Maintenance',
+      note: 'Navigate interconnected logic puzzles that strengthen executive function and reasoning.',
+      color: colors.stage1Gold,
+      borderColor: colors.stage1GoldBorder,
+      image: '/games/logic-lattice.png',
+    },
+    {
+      id: 'rhythmic-mirror',
+      game: 'Rhythmic Mirror',
+      stage: 'STAGE 1',
+      stageNum: 1,
+      subText: 'Coordination',
+      protocol: 'Cognitive Maintenance',
+      note: 'Mirror rhythmic patterns to enhance motor coordination and timing.',
+      color: colors.stage1Gold,
+      borderColor: colors.stage1GoldBorder,
+      image: '/games/rhythmic-mirror.png',
+    },
+    {
+      id: 'perspective-path',
+      game: 'Perspective Path',
+      stage: 'STAGE 1',
+      stageNum: 1,
+      subText: 'Spatial Mapping',
+      protocol: 'Cognitive Maintenance',
+      note: 'Navigate environments to maintain spatial awareness and mental rotation.',
+      color: colors.stage1Gold,
+      borderColor: colors.stage1GoldBorder,
+      image: '/games/perspective-path.png',
+    },
+    {
+      id: 'semantic-synthesis',
+      game: 'Semantic Synthesis',
+      stage: 'STAGE 1',
+      stageNum: 1,
+      subText: 'Association',
+      protocol: 'Cognitive Maintenance',
+      note: 'Connect meaningful concepts to reinforce semantic memory networks.',
+      color: colors.stage1Gold,
+      borderColor: colors.stage1GoldBorder,
+      image: '/games/semantic-synthesis.png',
+    },
+    {
+      id: 'pattern-pulse',
+      game: 'Pattern Pulse',
+      stage: 'STAGE 1',
+      stageNum: 1,
+      subText: 'Selective Attention',
+      protocol: 'Cognitive Maintenance',
+      note: 'Track and respond to visual patterns that train selective attention.',
+      color: colors.stage1Gold,
+      borderColor: colors.stage1GoldBorder,
+      image: '/games/pattern-pulse.png',
     },
   ];
 
-  // Stage 2 Cognitive Challenge Games (MOCKUP - not clickable)
+  // ============================================
+  // STAGE 2: REALITY VALIDATION (COGNITIVE CHALLENGE)
+  // Visual mockup only - NOT clickable
+  // ============================================
   const stage2Games = [
     {
       id: 'color-chemist',
       game: 'Color Chemist',
       stage: 'STAGE 2',
+      stageNum: 2,
       subText: 'Working Memory & Blending',
-      protocol: 'Cognitive Challenge',
-      note: 'Mix primary colors to match a target color. Exercises working memory and color theory.',
-      color: colors.challengeBlue,
-      borderColor: colors.challengeBlueBorder,
+      protocol: 'Reality Validation',
+      note: 'Mix primary colors to match a target. Exercises working memory and color theory.',
+      color: colors.stage2Blue,
+      borderColor: colors.stage2BlueBorder,
       image: '/games/color-chemist.png',
     },
     {
       id: 'compass-rose',
       game: 'The Compass Rose',
       stage: 'STAGE 2',
+      stageNum: 2,
       subText: 'Egocentric Navigation',
-      protocol: 'Cognitive Challenge',
+      protocol: 'Reality Validation',
       note: 'Navigate using cardinal directions. Reinforces spatial awareness.',
-      color: colors.challengeBlue,
-      borderColor: colors.challengeBlueBorder,
+      color: colors.stage2Blue,
+      borderColor: colors.stage2BlueBorder,
       image: '/games/compass-rose.png',
     },
     {
       id: 'gravity-maze',
       game: 'The Gravity Maze',
       stage: 'STAGE 2',
+      stageNum: 2,
       subText: 'Vestibular Integration',
-      protocol: 'Cognitive Challenge',
+      protocol: 'Reality Validation',
       note: 'Tilt the maze to guide the ball. Develops spatial reasoning.',
-      color: colors.challengeBlue,
-      borderColor: colors.challengeBlueBorder,
+      color: colors.stage2Blue,
+      borderColor: colors.stage2BlueBorder,
       image: '/games/gravity-maze.png',
     },
     {
       id: 'wayback-window',
       game: 'The Wayback Window',
       stage: 'STAGE 2',
+      stageNum: 2,
       subText: 'Visual Eraser & Recognition',
-      protocol: 'Cognitive Challenge',
+      protocol: 'Reality Validation',
       note: 'Wipe away the present to reveal nostalgic scenes from the past.',
-      color: colors.challengeBlue,
-      borderColor: colors.challengeBlueBorder,
+      color: colors.stage2Blue,
+      borderColor: colors.stage2BlueBorder,
       image: '/games/wayback-window.png',
     },
     {
       id: 'time-travelers-trunk',
       game: "The Time-Traveler's Trunk",
       stage: 'STAGE 2',
+      stageNum: 2,
       subText: 'Chronological Logic',
-      protocol: 'Cognitive Challenge',
+      protocol: 'Reality Validation',
       note: 'Sort items from different eras on a timeline. Exercises temporal sequencing.',
-      color: colors.challengeBlue,
-      borderColor: colors.challengeBlueBorder,
+      color: colors.stage2Blue,
+      borderColor: colors.stage2BlueBorder,
       image: '/games/time-travelers-trunk.png',
     },
   ];
 
-  // Stage 3 Sensory Games (clickable)
+  // ============================================
+  // STAGE 3: SENSORY GROUNDING (COMFORT)
+  // Fully functional - patient-side rendering active
+  // ============================================
   const stage3Games = [
     {
       id: 'calm-current',
@@ -291,10 +370,10 @@ export default function MonitoringDashboard() {
       stage: 'STAGE 3',
       stageNum: 3,
       subText: 'Kinetic Grounding',
-      protocol: 'Branch A: Restlessness',
+      protocol: 'Sensory Comfort',
       note: 'Use for restless agitation or sundowning. Channels energy into calming visuals.',
-      color: '#4682B4',
-      borderColor: '#36648B',
+      color: colors.stage3Teal,
+      borderColor: colors.stage3TealBorder,
       image: '/games/sand-painter.png',
     },
     {
@@ -303,10 +382,10 @@ export default function MonitoringDashboard() {
       stage: 'STAGE 3',
       stageNum: 3,
       subText: 'Sensory Engagement',
-      protocol: 'Branch B: Withdrawal',
+      protocol: 'Sensory Comfort',
       note: 'Wipe away frost to reveal a calming view. Instant visual reward.',
-      color: '#4682B4',
-      borderColor: '#36648B',
+      color: colors.stage3Teal,
+      borderColor: colors.stage3TealBorder,
       image: '/games/switzerland_bg.jpg',
     },
     {
@@ -315,7 +394,7 @@ export default function MonitoringDashboard() {
       stage: 'STAGE 3',
       stageNum: 3,
       subText: 'Cosmic Fluidity',
-      protocol: 'Branch C: Sensory Immersion',
+      protocol: 'Sensory Comfort',
       note: 'Stir the cosmic dust. Vigorous movement ignites supernovas.',
       color: '#4B0082',
       borderColor: '#2E0854',
@@ -327,8 +406,8 @@ export default function MonitoringDashboard() {
       stage: 'STAGE 3',
       stageNum: 3,
       subText: 'Gentle Discovery',
-      protocol: 'Branch C: Sensory Immersion',
-      note: 'Hover to gently polish the marble slab, slowly revealing the statue underneath.',
+      protocol: 'Sensory Comfort',
+      note: 'Gently polish the marble slab, slowly revealing the statue underneath.',
       color: '#B0A99F',
       borderColor: '#8A847C',
       image: '/games/hidden_statue_thumb.jpg',
@@ -339,20 +418,22 @@ export default function MonitoringDashboard() {
       stage: 'STAGE 3',
       stageNum: 3,
       subText: 'Creative Reveal',
-      protocol: 'Branch C: Sensory Immersion',
-      note: 'Hover or touch to color in the sketch, revealing a beautiful meadow painting.',
+      protocol: 'Sensory Comfort',
+      note: 'Touch to color in the sketch, revealing a beautiful meadow painting.',
       color: '#7A9B6D',
       borderColor: '#5A7B4D',
       image: '/games/magic_meadow_thumb.jpg',
     },
   ];
 
-  // Render clickable game card (Stage 1 & 3)
-  const renderGameCard = (game: typeof stage3Games[0]) => {
+  // Render clickable game card (Stage 1 & Stage 3)
+  const renderGameCard = (game: typeof stage3Games[0], isMockup: boolean = false) => {
+    const isActive = activeGame === game.id;
+    
     const cardStyle: React.CSSProperties = {
       height: '320px',
       background: `linear-gradient(145deg, ${game.color}15, ${game.color}08)`,
-      border: `2px solid ${game.borderColor}40`,
+      border: isActive ? `3px solid ${game.color}` : `2px solid ${game.borderColor}40`,
       borderRadius: '16px',
       padding: '0',
       cursor: 'pointer',
@@ -363,13 +444,35 @@ export default function MonitoringDashboard() {
       flexDirection: 'column',
       textDecoration: 'none',
       color: 'inherit',
+      position: 'relative',
     };
 
     return (
       <button key={game.id} onClick={() => handleGameSelect(game.id)} style={cardStyle}>
+        {isActive && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0,
+            background: game.color, color: '#fff',
+            padding: '6px 12px', fontSize: '0.7rem', fontWeight: 700,
+            textAlign: 'center', letterSpacing: '0.5px', zIndex: 10,
+          }}>
+            🎮 GAME IN PROGRESS
+          </div>
+        )}
+        {isMockup && (
+          <div style={{
+            position: 'absolute', top: '12px', right: '12px',
+            background: 'rgba(0,0,0,0.6)', color: '#fff',
+            padding: '4px 8px', borderRadius: '4px',
+            fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.5px', zIndex: 10,
+          }}>
+            COMING SOON
+          </div>
+        )}
         <div style={{
           width: '100%', height: '140px', minHeight: '140px', position: 'relative',
           background: game.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginTop: isActive ? '28px' : '0',
         }}>
           <Image src={game.image} alt={game.game} fill style={{ objectFit: 'cover' }}
             onError={(e) => { e.currentTarget.style.display = 'none'; }} />
@@ -456,7 +559,7 @@ export default function MonitoringDashboard() {
 
   return (
     <div style={{ padding: '32px', background: colors.bg, minHeight: '100vh' }}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         <h1 style={{ color: colors.text, fontSize: '1.8rem', marginBottom: '8px' }}>
           Monitoring Dashboard
         </h1>
@@ -464,6 +567,7 @@ export default function MonitoringDashboard() {
           Control and monitor {patientName}&apos;s comfort sessions
         </p>
 
+        {/* Sentiment Glow Card */}
         <div style={{
           background: colors.card, borderRadius: '20px', padding: '24px',
           marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
@@ -494,6 +598,7 @@ export default function MonitoringDashboard() {
           )}
         </div>
 
+        {/* Kill Switch Alert */}
         {killSwitchTriggered && (
           <div style={{
             background: colors.danger, color: '#fff', borderRadius: '12px',
@@ -522,6 +627,7 @@ export default function MonitoringDashboard() {
           </div>
         )}
 
+        {/* Session Control */}
         <div style={{
           background: colors.card, borderRadius: '20px', padding: '32px',
           marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
@@ -570,6 +676,7 @@ export default function MonitoringDashboard() {
           </div>
         </div>
 
+        {/* Conversation Log */}
         <div style={{
           background: colors.card, borderRadius: '20px', padding: '32px',
           marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
@@ -578,7 +685,7 @@ export default function MonitoringDashboard() {
             Conversation Log
           </h2>
           <div style={{
-            maxHeight: '400px', overflowY: 'auto',
+            maxHeight: '300px', overflowY: 'auto',
             display: 'flex', flexDirection: 'column', gap: '12px', padding: '8px',
           }}>
             {conversation.length === 0 ? (
@@ -611,14 +718,14 @@ export default function MonitoringDashboard() {
           </div>
         </div>
 
-        {/* Therapeutic Interventions Grid */}
+        {/* Clinical Intervention Palette - Three Column Layout */}
         <div style={{
           background: colors.card, borderRadius: '20px', padding: '32px',
           marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
             <h2 style={{ color: colors.text, fontSize: '1.2rem', margin: 0 }}>
-              🎮 Therapeutic Interventions
+              🎮 Clinical Intervention Palette
             </h2>
             {activeGame && (
               <div style={{
@@ -636,61 +743,58 @@ export default function MonitoringDashboard() {
               </div>
             )}
           </div>
-          <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '20px' }}>
-            Select a therapeutic game matched to {patientName}&apos;s current cognitive stage
+          <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '24px' }}>
+            Select a therapeutic intervention matched to {patientName}&apos;s current cognitive stage
           </p>
 
-          {/* 3-Column Grid: Stage 1 | Stage 2 | Stage 3 */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '20px',
-            alignItems: 'start',
-          }}>
-            {/* Column 1: Stage 1 */}
+          {/* Three-Column Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+            {/* Column 1: Stage 1 - Maintenance */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{
-                background: '#DAA52020', padding: '8px 12px', borderRadius: '8px',
-                borderLeft: '3px solid #DAA520', marginBottom: '8px',
+                background: colors.stage1Gold + '20', padding: '10px 14px', borderRadius: '8px',
+                borderLeft: '4px solid ' + colors.stage1Gold,
               }}>
-                <h3 style={{ margin: 0, color: '#DAA520', fontSize: '0.85rem', fontWeight: 600 }}>
-                  STAGE 1: Ambient
-                </h3>
+                <h4 style={{ margin: 0, color: colors.stage1Gold, fontSize: '0.8rem', fontWeight: 700, letterSpacing: '1px' }}>
+                  STAGE 1: MAINTENANCE
+                </h4>
+                <p style={{ margin: '4px 0 0', color: colors.textMuted, fontSize: '0.75rem' }}>
+                  Elite cognitive exercises
+                </p>
               </div>
-              {stage1Games.map(renderGameCard)}
+              {stage1Games.map(renderStage2MockupCard)}
             </div>
 
-            {/* Column 2: Stage 2 Cognitive Challenge */}
+            {/* Column 2: Stage 2 - Validation */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{
-                background: colors.challengeBlue + '20', padding: '8px 12px', borderRadius: '8px',
-                borderLeft: '3px solid ' + colors.challengeBlue, marginBottom: '8px',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                background: colors.stage2Blue + '20', padding: '10px 14px', borderRadius: '8px',
+                borderLeft: '4px solid ' + colors.stage2Blue,
               }}>
-                <h3 style={{ margin: 0, color: colors.challengeBlue, fontSize: '0.85rem', fontWeight: 600 }}>
-                  STAGE 2: Cognitive
-                </h3>
-                <span style={{
-                  background: colors.challengeBlue, color: '#fff',
-                  padding: '2px 6px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 600,
-                }}>
-                  PREVIEW
-                </span>
+                <h4 style={{ margin: 0, color: colors.stage2Blue, fontSize: '0.8rem', fontWeight: 700, letterSpacing: '1px' }}>
+                  STAGE 2: VALIDATION
+                </h4>
+                <p style={{ margin: '4px 0 0', color: colors.textMuted, fontSize: '0.75rem' }}>
+                  Reality grounding tasks
+                </p>
               </div>
               {stage2Games.map(renderStage2MockupCard)}
             </div>
 
-            {/* Column 3: Stage 3 Sensory */}
+            {/* Column 3: Stage 3 - Comfort */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{
-                background: '#4682B420', padding: '8px 12px', borderRadius: '8px',
-                borderLeft: '3px solid #4682B4', marginBottom: '8px',
+                background: colors.stage3Teal + '20', padding: '10px 14px', borderRadius: '8px',
+                borderLeft: '4px solid ' + colors.stage3Teal,
               }}>
-                <h3 style={{ margin: 0, color: '#4682B4', fontSize: '0.85rem', fontWeight: 600 }}>
-                  STAGE 3: Sensory
-                </h3>
+                <h4 style={{ margin: 0, color: colors.stage3Teal, fontSize: '0.8rem', fontWeight: 700, letterSpacing: '1px' }}>
+                  STAGE 3: COMFORT
+                </h4>
+                <p style={{ margin: '4px 0 0', color: colors.textMuted, fontSize: '0.75rem' }}>
+                  Sensory grounding experiences
+                </p>
               </div>
-              {stage3Games.map(renderGameCard)}
+              {stage3Games.map(game => renderGameCard(game, false))}
             </div>
           </div>
 
@@ -760,6 +864,7 @@ export default function MonitoringDashboard() {
           </div>
         </div>
 
+        {/* Stats Footer */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
           <div style={{ background: colors.card, borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
             <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '8px' }}>Messages</p>
