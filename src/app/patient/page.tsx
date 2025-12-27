@@ -88,14 +88,14 @@ export default function PatientComfort() {
   // ============================================
   // HANDLE END GAME - Log duration and navigate back
   // ============================================
-  const handleEndGame = useCallback(() => {
+  const handleEndGame = useCallback((endedBy: 'manual' | 'auto-navigation' = 'manual') => {
     const startTimeStr = localStorage.getItem('everloved-game-start-time');
     const gameId = localStorage.getItem('everloved-active-game');
-    
+
     if (startTimeStr && gameId) {
       const startTime = parseInt(startTimeStr, 10);
       const duration = Math.floor((Date.now() - startTime) / 1000);
-      
+
       // Get game name (matches intervention IDs from monitoring page)
       const gameNames: Record<string, string> = {
         'calm-current': 'The Sand-Painter',
@@ -107,7 +107,7 @@ export default function PatientComfort() {
         'infinite-weaver': 'Infinite Weaver',
       };
       const gameName = gameNames[gameId] || gameId;
-      
+
       // Log to game log only (not conversation log - that's for puppy interactions)
       const existingGameLog = localStorage.getItem('everloved-game-log');
       const gameLog = existingGameLog ? JSON.parse(existingGameLog) : [];
@@ -116,17 +116,20 @@ export default function PatientComfort() {
         gameId: gameId,
         duration: duration,
         timestamp: new Date().toISOString(),
+        endedBy: endedBy,
       });
       localStorage.setItem('everloved-game-log', JSON.stringify(gameLog));
     }
-    
+
     // Clear active game
     localStorage.removeItem('everloved-active-game');
     localStorage.removeItem('everloved-game-start-time');
     setActiveGame(null);
-    
-    // Navigate back to dashboard
-    router.push('/caregiver/monitoring');
+
+    // Only navigate if manual end (not during cleanup)
+    if (endedBy === 'manual') {
+      router.push('/caregiver/monitoring');
+    }
   }, [router]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -211,6 +214,7 @@ export default function PatientComfort() {
   const isStreamingRef = useRef(false);
   const streamTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasAutoStarted = useRef(false);
+  const wasActiveSessionRef = useRef(false);  // Tracks if ?start=true was present (not passive mode)
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const amplitudeIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -1249,6 +1253,79 @@ export default function PatientComfort() {
     return () => clearInterval(interval);
   }, []);
 
+  // ============================================
+  // AUTO-TERMINATION ON NAVIGATION
+  // Ends session when user navigates away from patient page
+  // ============================================
+  useEffect(() => {
+    // Check if this is an active session (not passive mode)
+    const urlParams = new URLSearchParams(window.location.search);
+    const isActiveSession = urlParams.get('start') === 'true';
+    wasActiveSessionRef.current = isActiveSession;
+
+    return () => {
+      // AUTO-END PUPPY SESSION on navigation (only if ?start=true was present)
+      if (wasActiveSessionRef.current) {
+        const sessionStartStr = localStorage.getItem('everloved-session-start');
+        if (sessionStartStr && localStorage.getItem('everloved-session-active') === 'true') {
+          const startTime = parseInt(sessionStartStr, 10);
+          const duration = Math.floor((Date.now() - startTime) / 1000);
+
+          // Log the session to game log with auto-navigation flag
+          const existingGameLog = localStorage.getItem('everloved-game-log');
+          const gameLog = existingGameLog ? JSON.parse(existingGameLog) : [];
+          gameLog.push({
+            gameName: 'Puppy Interaction',
+            gameId: 'puppy-interaction',
+            duration: duration,
+            timestamp: new Date().toISOString(),
+            endedBy: 'auto-navigation',
+          });
+          localStorage.setItem('everloved-game-log', JSON.stringify(gameLog));
+
+          // End the session
+          localStorage.setItem('everloved-session-active', 'false');
+        }
+      }
+
+      // AUTO-END GAME SESSION on navigation (if a game was active)
+      const activeGameId = localStorage.getItem('everloved-active-game');
+      if (activeGameId) {
+        const startTimeStr = localStorage.getItem('everloved-game-start-time');
+        if (startTimeStr) {
+          const startTime = parseInt(startTimeStr, 10);
+          const duration = Math.floor((Date.now() - startTime) / 1000);
+
+          const gameNames: Record<string, string> = {
+            'calm-current': 'The Sand-Painter',
+            'bioluminescent-tide': 'Bioluminescent Tide',
+            'nebula-stir': 'Nebula Stir',
+            'hidden-statue': 'The Hidden Statue',
+            'magic-meadow': 'Magic Meadow',
+            'frosty-window': 'The Frosty Window',
+            'infinite-weaver': 'Infinite Weaver',
+          };
+          const gameName = gameNames[activeGameId] || activeGameId;
+
+          const existingGameLog = localStorage.getItem('everloved-game-log');
+          const gameLog = existingGameLog ? JSON.parse(existingGameLog) : [];
+          gameLog.push({
+            gameName: gameName,
+            gameId: activeGameId,
+            duration: duration,
+            timestamp: new Date().toISOString(),
+            endedBy: 'auto-navigation',
+          });
+          localStorage.setItem('everloved-game-log', JSON.stringify(gameLog));
+
+          // Clear active game
+          localStorage.removeItem('everloved-active-game');
+          localStorage.removeItem('everloved-game-start-time');
+        }
+      }
+    };
+  }, []);
+
   const isSessionActive = () => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('everloved-session-active') === 'true';
@@ -1785,7 +1862,7 @@ export default function PatientComfort() {
       >
         <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
 
-        <button onClick={handleEndGame} style={{
+        <button onClick={() => handleEndGame('manual')} style={{
           position: 'absolute', top: '20px', right: '20px', padding: '12px 20px',
           background: 'rgba(255,255,255,0.95)', borderRadius: '12px', color: '#000',
           fontSize: '1rem', fontWeight: 800,
@@ -1846,7 +1923,7 @@ export default function PatientComfort() {
       >
         <canvas ref={tideCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
 
-        <button onClick={handleEndGame} style={{
+        <button onClick={() => handleEndGame('manual')} style={{
           position: 'absolute', top: '20px', right: '20px', padding: '12px 20px',
           background: 'rgba(255,255,255,0.95)', borderRadius: '12px', color: '#000',
           fontSize: '1rem', fontWeight: 800,
@@ -1923,7 +2000,7 @@ export default function PatientComfort() {
         <canvas ref={frostyBgCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
         <canvas ref={frostySnowCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
 
-        <button onClick={handleEndGame} style={{
+        <button onClick={() => handleEndGame('manual')} style={{
           position: 'absolute', top: '20px', right: '20px', padding: '12px 20px',
           background: 'rgba(255,255,255,0.95)', borderRadius: '12px', color: '#000',
           fontSize: '1rem', fontWeight: 800,
