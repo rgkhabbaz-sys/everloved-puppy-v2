@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { NebulaStir } from './NebulaStir';
 import { HiddenStatue } from './HiddenStatue';
 import { MagicMeadow } from './MagicMeadow';
+import { ColorChemist } from './ColorChemist';
 import { AnimatedPuppy } from '@/components/AnimatedPuppy';
 
 // ============================================
@@ -1899,6 +1900,13 @@ export default function PatientComfort() {
   // ============================================
   if (activeGame === 'magic-meadow') {
     return <MagicMeadow gameSessionDuration={gameSessionDuration} onEndGame={handleEndGame} />;
+  }
+
+  // ============================================
+  // RENDER: COLOR CHEMIST GAME (Stage 2)
+  // ============================================
+  if (activeGame === 'color-chemist') {
+    return <ColorChemist gameSessionDuration={gameSessionDuration} onEndGame={handleEndGame} />;
   }
 
   // ============================================
