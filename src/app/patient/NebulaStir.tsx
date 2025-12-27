@@ -132,8 +132,8 @@ export function NebulaStir({ gameSessionDuration, onEndGame }: NebulaStirProps) 
         }
       }
 
-      // Render supernovas with bloom effect (density field removed to preserve nebula clarity)
-      ctx.globalCompositeOperation = 'lighter';
+      // Render supernovas with soft amber glow (no white flash)
+      ctx.globalCompositeOperation = 'source-over';
       for (let i = supernovasRef.current.length - 1; i >= 0; i--) {
         const sn = supernovasRef.current[i];
         sn.age += 0.016;
@@ -145,19 +145,21 @@ export function NebulaStir({ gameSessionDuration, onEndGame }: NebulaStirProps) 
         let scale, alpha;
         if (sn.age < 0.15) {
           scale = (sn.age / 0.15) * 150 * sn.intensity;
-          alpha = sn.age / 0.15;
+          alpha = (sn.age / 0.15) * 0.6;
         } else if (sn.age < 0.25) {
           scale = 150 * sn.intensity;
-          alpha = 1;
+          alpha = 0.6;
         } else {
           scale = 150 * sn.intensity + (sn.age - 0.25) * 50;
-          alpha = 1 - (sn.age - 0.25) / 0.75;
+          alpha = 0.6 * (1 - (sn.age - 0.25) / 0.75);
         }
 
+        // Bright amber center -> dark amber outer (no white)
         const coreGrad = ctx.createRadialGradient(sn.x, sn.y, 0, sn.x, sn.y, scale);
-        coreGrad.addColorStop(0, `rgba(255,255,255,${alpha})`);
-        coreGrad.addColorStop(0.2, `rgba(255,200,100,${alpha * 0.8})`);
-        coreGrad.addColorStop(0.5, `rgba(255,100,50,${alpha * 0.4})`);
+        coreGrad.addColorStop(0, `rgba(255,160,50,${alpha})`);
+        coreGrad.addColorStop(0.2, `rgba(230,120,30,${alpha * 0.7})`);
+        coreGrad.addColorStop(0.5, `rgba(180,80,10,${alpha * 0.4})`);
+        coreGrad.addColorStop(0.8, `rgba(120,50,0,${alpha * 0.15})`);
         coreGrad.addColorStop(1, 'transparent');
         ctx.fillStyle = coreGrad;
         ctx.beginPath();

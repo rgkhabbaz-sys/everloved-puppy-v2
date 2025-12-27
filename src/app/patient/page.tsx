@@ -726,7 +726,7 @@ export default function PatientComfort() {
         }
       }
       for (let i = 0; i < velocities.length; i++) { velocities[i] *= 0.985; }
-      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalCompositeOperation = 'source-over';
       for (let gy = 0; gy < gridSize; gy++) {
         for (let gx = 0; gx < gridSize; gx++) {
           const idx = (gy * gridSize + gx) * 2;
@@ -737,12 +737,12 @@ export default function PatientComfort() {
             const x = (gx + 0.5) * cellSize.x;
             const y = (gy + 0.5) * cellSize.y;
             const size = 20 + speed * 100;
-            const alpha = Math.min(0.4, speed * 2);
+            const alpha = Math.min(0.0375, speed * 0.2);
             const colorPhase = (gx + gy + nebulaTimeRef.current * 10) % 30;
             let r, g, b;
             if (colorPhase < 10) { r = 138; g = 43; b = isNightMode ? 0 : 226; }
             else if (colorPhase < 20) { r = 75; g = 0; b = isNightMode ? 0 : 130; }
-            else { r = 255; g = 215; b = 0; }
+            else { r = 255; g = 180; b = 0; }
             const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
             gradient.addColorStop(0, 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')');
             gradient.addColorStop(0.5, 'rgba(' + r + ',' + g + ',' + b + ',' + (alpha * 0.3) + ')');
@@ -759,20 +759,25 @@ export default function PatientComfort() {
         sn.age += 0.016;
         if (sn.age > 2) { nebulaSupernovasRef.current.splice(i, 1); continue; }
         let scale, alpha;
-        if (sn.age < 0.3) { scale = (sn.age / 0.3) * 150 * sn.intensity; alpha = sn.age / 0.3; }
-        else if (sn.age < 0.5) { scale = 150 * sn.intensity; alpha = 1; }
-        else { scale = 150 * sn.intensity + (sn.age - 0.5) * 50; alpha = 1 - (sn.age - 0.5) / 1.5; }
+        if (sn.age < 0.3) { scale = (sn.age / 0.3) * 150 * sn.intensity; alpha = (sn.age / 0.3) * 0.2; }
+        else if (sn.age < 0.5) { scale = 150 * sn.intensity; alpha = 0.2; }
+        else { scale = 150 * sn.intensity + (sn.age - 0.5) * 50; alpha = 0.2 * (1 - (sn.age - 0.5) / 1.5); }
+        // Use normal blending to prevent white washout
+        ctx.globalCompositeOperation = 'source-over';
         const coreGrad = ctx.createRadialGradient(sn.x, sn.y, 0, sn.x, sn.y, scale);
-        coreGrad.addColorStop(0, 'rgba(255,255,255,' + alpha + ')');
-        coreGrad.addColorStop(0.2, 'rgba(255,200,100,' + (alpha * 0.8) + ')');
-        coreGrad.addColorStop(0.5, 'rgba(255,100,50,' + (alpha * 0.4) + ')');
+        // Bright amber center -> dark amber outer (no white)
+        coreGrad.addColorStop(0, 'rgba(255,150,30,' + alpha + ')');
+        coreGrad.addColorStop(0.15, 'rgba(240,120,15,' + (alpha * 0.85) + ')');
+        coreGrad.addColorStop(0.4, 'rgba(180,80,5,' + (alpha * 0.5) + ')');
+        coreGrad.addColorStop(0.7, 'rgba(120,50,0,' + (alpha * 0.25) + ')');
         coreGrad.addColorStop(1, 'transparent');
         ctx.fillStyle = coreGrad;
         ctx.beginPath();
         ctx.arc(sn.x, sn.y, scale, 0, Math.PI * 2);
         ctx.fill();
+        // Amber rays (no white)
         if (sn.age < 0.8) {
-          ctx.strokeStyle = 'rgba(255,255,255,' + (alpha * 0.5) + ')';
+          ctx.strokeStyle = 'rgba(220,130,20,' + (alpha * 0.0875) + ')';
           ctx.lineWidth = 2;
           for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
             ctx.beginPath();
