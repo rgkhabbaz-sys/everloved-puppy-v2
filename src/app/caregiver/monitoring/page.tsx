@@ -778,7 +778,11 @@ export default function MonitoringDashboard() {
                   Reality grounding tasks
                 </p>
               </div>
-              {stage2Games.map(renderStage2MockupCard)}
+              {stage2Games.map(game =>
+                game.id === 'color-chemist'
+                  ? renderGameCard(game, false)
+                  : renderStage2MockupCard(game)
+              )}
             </div>
 
             {/* Column 3: Stage 3 - Comfort */}
