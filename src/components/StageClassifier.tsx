@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const STAGES = {
   early: {
@@ -62,6 +62,28 @@ export default function StageClassifier() {
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [savedStage, setSavedStage] = useState<StageKey>('middle');
+
+  // Load saved stage from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('everloved-disease-stage');
+      if (saved && ['early', 'middle', 'late'].includes(saved)) {
+        setSelectedStage(saved as StageKey);
+        setSavedStage(saved as StageKey);
+      }
+    } catch (e) {
+      console.log('Error loading disease stage from localStorage:', e);
+    }
+  }, []);
+
+  // Save stage to localStorage when confirmed
+  useEffect(() => {
+    try {
+      localStorage.setItem('everloved-disease-stage', savedStage);
+    } catch (e) {
+      console.log('Error saving disease stage to localStorage:', e);
+    }
+  }, [savedStage]);
 
   const stage = STAGES[selectedStage];
   const hasChanges = selectedStage !== savedStage;
