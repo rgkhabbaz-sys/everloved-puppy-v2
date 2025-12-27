@@ -1762,6 +1762,8 @@ export default function PatientComfort() {
         }
         if (data.chunkIndex === 0) {
           setStatusMessage(data.text);
+          // Log avatar's statement to conversation log
+          saveToLog('companion', data.text);
         }
       } else if (data.type === 'response_text') {
         if (data.text.includes("didn't catch")) {
