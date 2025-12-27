@@ -57,23 +57,33 @@ const STAGES = {
 
 type StageKey = 'early' | 'middle' | 'late';
 
+// Helper to safely get from localStorage
+function getStoredStage(): StageKey {
+  if (typeof window === 'undefined') return 'middle';
+  try {
+    const saved = localStorage.getItem('everloved-disease-stage');
+    if (saved && ['early', 'middle', 'late'].includes(saved)) {
+      return saved as StageKey;
+    }
+  } catch (e) {
+    console.log('Error loading disease stage:', e);
+  }
+  return 'middle';
+}
+
 export default function StageClassifier() {
   const [selectedStage, setSelectedStage] = useState<StageKey>('middle');
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [savedStage, setSavedStage] = useState<StageKey>('middle');
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Load saved stage from localStorage on mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('everloved-disease-stage');
-      if (saved && ['early', 'middle', 'late'].includes(saved)) {
-        setSelectedStage(saved as StageKey);
-        setSavedStage(saved as StageKey);
-      }
-    } catch (e) {
-      console.log('Error loading disease stage from localStorage:', e);
-    }
+    const stored = getStoredStage();
+    setSelectedStage(stored);
+    setSavedStage(stored);
+    setIsLoaded(true);
   }, []);
 
   const stage = STAGES[selectedStage];
@@ -122,6 +132,15 @@ export default function StageClassifier() {
       <p style={{ margin: 0, color: colors.text, fontSize: '0.95rem', lineHeight: 1.6 }}>{children}</p>
     </div>
   );
+
+  // Don't render until we've loaded from localStorage
+  if (!isLoaded) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: colors.textMuted }}>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: 'relative' }}>
