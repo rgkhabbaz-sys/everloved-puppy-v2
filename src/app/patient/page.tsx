@@ -129,6 +129,60 @@ export default function PatientComfort() {
     router.push('/caregiver/monitoring');
   }, [router]);
 
+  // ============================================
+  // HANDLE EXIT TO MONITORING - End session, log game, navigate
+  // Called when clicking "Monitoring Dashboard" nav button
+  // ============================================
+  const handleExitToMonitoring = useCallback(() => {
+    // Log the active game if one exists
+    const startTimeStr = localStorage.getItem('everloved-game-start-time');
+    const gameId = localStorage.getItem('everloved-active-game');
+    
+    if (startTimeStr && gameId) {
+      const startTime = parseInt(startTimeStr, 10);
+      const duration = Math.floor((Date.now() - startTime) / 1000);
+      
+      const gameNames: Record<string, string> = {
+        'calm-current': 'The Sand-Painter',
+        'bioluminescent-tide': 'Bioluminescent Tide',
+        'nebula-stir': 'Nebula Stir',
+        'hidden-statue': 'The Hidden Statue',
+        'magic-meadow': 'Magic Meadow',
+        'frosty-window': 'The Frosty Window',
+        'infinite-weaver': 'Infinite Weaver',
+      };
+      const gameName = gameNames[gameId] || gameId;
+      
+      const existingGameLog = localStorage.getItem('everloved-game-log');
+      const gameLog = existingGameLog ? JSON.parse(existingGameLog) : [];
+      gameLog.push({
+        gameName: gameName,
+        gameId: gameId,
+        duration: duration,
+        timestamp: new Date().toISOString(),
+      });
+      localStorage.setItem('everloved-game-log', JSON.stringify(gameLog));
+    }
+    
+    // Clear game state
+    localStorage.removeItem('everloved-active-game');
+    localStorage.removeItem('everloved-game-start-time');
+    setActiveGame(null);
+    
+    // End the session
+    localStorage.setItem('everloved-session-active', 'false');
+    localStorage.removeItem('everloved-session-start');
+    
+    // Close WebSocket cleanly
+    if (wsRef.current) {
+      wsRef.current.onclose = null; // Prevent reconnect handler
+      wsRef.current.close();
+    }
+    
+    // Navigate to monitoring dashboard
+    router.push('/caregiver/monitoring');
+  }, [router]);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tideCanvasRef = useRef<HTMLCanvasElement>(null);
   const gameAnimationRef = useRef<number>(0);
@@ -2036,18 +2090,19 @@ export default function PatientComfort() {
   // ============================================
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      <Link
-        href="/caregiver/monitoring"
+      <button
+        onClick={handleExitToMonitoring}
         style={{
           position: 'absolute', top: '16px', right: '16px', zIndex: 10,
           padding: '10px 20px', borderRadius: '20px',
           background: uiColors.cardBg, color: uiColors.textMuted,
           fontWeight: 500, fontSize: '0.85rem', textDecoration: 'none',
           border: '1px solid ' + uiColors.cardBorder, backdropFilter: 'blur(10px)',
+          cursor: 'pointer',
         }}
       >
         Monitoring Dashboard
-      </Link>
+      </button>
 
       <div
         onClick={handleScreenTap}
