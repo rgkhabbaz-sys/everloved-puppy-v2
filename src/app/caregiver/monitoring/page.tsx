@@ -48,7 +48,8 @@ export default function MonitoringDashboard() {
     if (saved) setPatientName(saved);
 
     const checkState = () => {
-      const active = localStorage.getItem('everloved-session-active') === 'true';
+      const sessionValue = localStorage.getItem('everloved-session-active');
+      const active = sessionValue === 'true';
       setSessionActive(active);
       
       const killSwitch = localStorage.getItem('everloved-kill-switch') === 'true';
@@ -75,8 +76,13 @@ export default function MonitoringDashboard() {
       } catch (e) {}
 
       if (active) {
-        const startTime = parseInt(localStorage.getItem('everloved-session-start') || '0');
-        setSessionDuration(Math.floor((Date.now() - startTime) / 1000));
+        const startTimeStr = localStorage.getItem('everloved-session-start');
+        if (startTimeStr) {
+          const startTime = parseInt(startTimeStr);
+          setSessionDuration(Math.floor((Date.now() - startTime) / 1000));
+        }
+      } else {
+        setSessionDuration(0);
       }
     };
 
@@ -113,13 +119,12 @@ export default function MonitoringDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!activeGame || !gameStartTime) {
-      setGameTimer(0);
-      return;
+    let interval: NodeJS.Timeout;
+    if (activeGame && gameStartTime) {
+      interval = setInterval(() => {
+        setGameTimer(Math.floor((Date.now() - gameStartTime) / 1000));
+      }, 1000);
     }
-    const interval = setInterval(() => {
-      setGameTimer(Math.floor((Date.now() - gameStartTime) / 1000));
-    }, 1000);
     return () => clearInterval(interval);
   }, [activeGame, gameStartTime]);
 
@@ -127,10 +132,6 @@ export default function MonitoringDashboard() {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const formatTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
 
   const handleStartInteraction = () => {
@@ -145,14 +146,7 @@ export default function MonitoringDashboard() {
     router.push('/patient?start=true');
   };
 
-  const handleEndInteraction = () => {
-    localStorage.setItem('everloved-session-active', 'false');
-    setSessionActive(false);
-    setSessionDuration(0);
-  };
-
   const handleGameSelect = (gameId: string) => {
-    // Click on card = immediately start game and navigate
     const startTime = Date.now();
     setActiveGame(gameId);
     setSelectedGame(gameId);
@@ -166,34 +160,22 @@ export default function MonitoringDashboard() {
   const getGameName = (gameId: string) => {
     const gameNames: Record<string, string> = {
       'golden-thread': 'The Golden Thread',
-      'lifes-ledger': "Life's Ledger",
       'calm-current': 'The Sand-Painter',
       'frosty-window': 'The Frosty Window',
       'nebula-stir': 'The Nebula Stir',
+      'hidden-statue': 'The Hidden Statue',
+      'magic-meadow': 'Magic Meadow',
     };
     return gameNames[gameId] || gameId;
   };
 
-  const handleStartGame = (gameId: string) => {
-    if (activeGame || selectedGame !== gameId) return;
-    const startTime = Date.now();
-    setActiveGame(gameId);
-    setGameStartTime(startTime);
-    setGameTimer(0);
-    localStorage.setItem('everloved-active-game', gameId);
-    localStorage.setItem('everloved-game-start-time', startTime.toString());
-    router.push('/patient?start=true');
-  };
-
-  const handleEndGame = (gameId: string) => {
-    if (activeGame !== gameId) return;
-    
-    if (gameStartTime) {
+  const handleEndGame = () => {
+    if (activeGame && gameStartTime) {
       const duration = Math.floor((Date.now() - gameStartTime) / 1000);
       const newEntry: GameLogEntry = {
-        gameName: getGameName(gameId),
-        gameId: gameId,
-        duration: duration,
+        gameName: getGameName(activeGame),
+        gameId: activeGame,
+        duration,
         timestamp: new Date().toISOString(),
       };
       const updatedLog = [...gameLog, newEntry];
@@ -222,9 +204,12 @@ export default function MonitoringDashboard() {
     patientBubble: '#E8F4EA',
     companionBubble: '#F0E6D3',
     systemBubble: '#FFE5E5',
+    challengeBlue: '#4A90A4',
+    challengeBlueBorder: '#357A8C',
   };
 
-  const interventions = [
+  // Stage 1 Game
+  const stage1Games = [
     {
       id: 'golden-thread',
       game: 'The Golden Thread',
@@ -237,18 +222,69 @@ export default function MonitoringDashboard() {
       borderColor: '#B8860B',
       image: '/games/golden-thread.png',
     },
+  ];
+
+  // Stage 2 Cognitive Challenge Games (MOCKUP - not clickable)
+  const stage2Games = [
     {
-      id: 'lifes-ledger',
-      game: "Life's Ledger",
+      id: 'color-chemist',
+      game: 'Color Chemist',
       stage: 'STAGE 2',
-      stageNum: 2,
-      subText: 'Memory Anchoring',
-      protocol: 'Reality Validation',
-      note: 'Use to ground the patient when they seem lost or confused.',
-      color: '#A0522D',
-      borderColor: '#8B4513',
-      image: '/games/lifes-ledger.png',
+      subText: 'Working Memory & Blending',
+      protocol: 'Cognitive Challenge',
+      note: 'Mix primary colors to match a target color. Exercises working memory and color theory.',
+      color: colors.challengeBlue,
+      borderColor: colors.challengeBlueBorder,
+      image: '/games/color-chemist.png',
     },
+    {
+      id: 'compass-rose',
+      game: 'The Compass Rose',
+      stage: 'STAGE 2',
+      subText: 'Egocentric Navigation',
+      protocol: 'Cognitive Challenge',
+      note: 'Navigate using cardinal directions. Reinforces spatial awareness.',
+      color: colors.challengeBlue,
+      borderColor: colors.challengeBlueBorder,
+      image: '/games/compass-rose.png',
+    },
+    {
+      id: 'gravity-maze',
+      game: 'The Gravity Maze',
+      stage: 'STAGE 2',
+      subText: 'Vestibular Integration',
+      protocol: 'Cognitive Challenge',
+      note: 'Tilt the maze to guide the ball. Develops spatial reasoning.',
+      color: colors.challengeBlue,
+      borderColor: colors.challengeBlueBorder,
+      image: '/games/gravity-maze.png',
+    },
+    {
+      id: 'wayback-window',
+      game: 'The Wayback Window',
+      stage: 'STAGE 2',
+      subText: 'Visual Eraser & Recognition',
+      protocol: 'Cognitive Challenge',
+      note: 'Wipe away the present to reveal nostalgic scenes from the past.',
+      color: colors.challengeBlue,
+      borderColor: colors.challengeBlueBorder,
+      image: '/games/wayback-window.png',
+    },
+    {
+      id: 'time-travelers-trunk',
+      game: "The Time-Traveler's Trunk",
+      stage: 'STAGE 2',
+      subText: 'Chronological Logic',
+      protocol: 'Cognitive Challenge',
+      note: 'Sort items from different eras on a timeline. Exercises temporal sequencing.',
+      color: colors.challengeBlue,
+      borderColor: colors.challengeBlueBorder,
+      image: '/games/time-travelers-trunk.png',
+    },
+  ];
+
+  // Stage 3 Sensory Games (clickable)
+  const stage3Games = [
     {
       id: 'calm-current',
       game: 'The Sand-Painter',
@@ -292,7 +328,7 @@ export default function MonitoringDashboard() {
       stageNum: 3,
       subText: 'Gentle Discovery',
       protocol: 'Branch C: Sensory Immersion',
-      note: 'Hover to gently polish the marble slab, slowly revealing the statue underneath. A soothing, error-free experience.',
+      note: 'Hover to gently polish the marble slab, slowly revealing the statue underneath.',
       color: '#B0A99F',
       borderColor: '#8A847C',
       image: '/games/hidden_statue_thumb.jpg',
@@ -304,18 +340,19 @@ export default function MonitoringDashboard() {
       stageNum: 3,
       subText: 'Creative Reveal',
       protocol: 'Branch C: Sensory Immersion',
-      note: 'Hover or touch to color in the black-and-white sketch, revealing a beautiful meadow painting. A soothing, endless loop of creation.',
+      note: 'Hover or touch to color in the sketch, revealing a beautiful meadow painting.',
       color: '#7A9B6D',
       borderColor: '#5A7B4D',
       image: '/games/magic_meadow_thumb.jpg',
     },
   ];
 
-  const renderGameCard = (intervention: typeof interventions[0]) => {
+  // Render clickable game card (Stage 1 & 3)
+  const renderGameCard = (game: typeof stage3Games[0]) => {
     const cardStyle: React.CSSProperties = {
       height: '320px',
-      background: `linear-gradient(145deg, ${intervention.color}15, ${intervention.color}08)`,
-      border: `2px solid ${intervention.borderColor}40`,
+      background: `linear-gradient(145deg, ${game.color}15, ${game.color}08)`,
+      border: `2px solid ${game.borderColor}40`,
       borderRadius: '16px',
       padding: '0',
       cursor: 'pointer',
@@ -328,44 +365,92 @@ export default function MonitoringDashboard() {
       color: 'inherit',
     };
 
-    const cardContent = (
-      <>
+    return (
+      <button key={game.id} onClick={() => handleGameSelect(game.id)} style={cardStyle}>
         <div style={{
           width: '100%', height: '140px', minHeight: '140px', position: 'relative',
-          background: intervention.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: game.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Image src={intervention.image} alt={intervention.game} fill style={{ objectFit: 'cover' }}
+          <Image src={game.image} alt={game.game} fill style={{ objectFit: 'cover' }}
             onError={(e) => { e.currentTarget.style.display = 'none'; }} />
         </div>
         <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div style={{
-            display: 'inline-block', background: intervention.color, color: '#fff',
+            display: 'inline-block', background: game.color, color: '#fff',
             padding: '4px 10px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700,
             letterSpacing: '0.5px', marginBottom: '8px', alignSelf: 'flex-start',
           }}>
-            {intervention.stage}
+            {game.stage}
           </div>
           <h3 style={{ margin: '0 0 4px 0', color: colors.text, fontSize: '1.05rem', fontWeight: 600 }}>
-            {intervention.game}
+            {game.game}
           </h3>
-          <p style={{ margin: '0 0 8px 0', color: intervention.color, fontSize: '0.85rem', fontWeight: 500 }}>
-            {intervention.subText} • {intervention.protocol}
+          <p style={{ margin: '0 0 8px 0', color: game.color, fontSize: '0.85rem', fontWeight: 500 }}>
+            {game.subText} • {game.protocol}
           </p>
           <p style={{ margin: 0, color: colors.textMuted, fontSize: '0.8rem', lineHeight: 1.4 }}>
-            {intervention.note}
+            {game.note}
           </p>
         </div>
-      </>
+      </button>
     );
+  };
+
+  // Render Stage 2 mockup card (NOT clickable)
+  const renderStage2MockupCard = (game: typeof stage2Games[0]) => {
+    const cardStyle: React.CSSProperties = {
+      height: '320px',
+      background: `linear-gradient(145deg, ${game.color}15, ${game.color}08)`,
+      border: `2px solid ${game.borderColor}60`,
+      borderRadius: '16px',
+      padding: '0',
+      cursor: 'default',
+      textAlign: 'left',
+      transition: 'all 0.2s ease',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      color: 'inherit',
+      opacity: 0.85,
+      position: 'relative',
+    };
 
     return (
-      <button
-        key={intervention.id}
-        onClick={() => handleGameSelect(intervention.id)}
-        style={cardStyle}
-      >
-        {cardContent}
-      </button>
+      <div key={game.id} style={cardStyle}>
+        <div style={{
+          position: 'absolute', top: '12px', right: '12px',
+          background: 'rgba(0,0,0,0.6)', color: '#fff',
+          padding: '4px 8px', borderRadius: '4px',
+          fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.5px', zIndex: 10,
+        }}>
+          COMING SOON
+        </div>
+        <div style={{
+          width: '100%', height: '140px', minHeight: '140px', position: 'relative',
+          background: game.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Image src={game.image} alt={game.game} fill style={{ objectFit: 'cover' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+        </div>
+        <div style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{
+            display: 'inline-block', background: game.color, color: '#fff',
+            padding: '4px 10px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700,
+            letterSpacing: '0.5px', marginBottom: '8px', alignSelf: 'flex-start',
+          }}>
+            {game.stage}
+          </div>
+          <h3 style={{ margin: '0 0 4px 0', color: colors.text, fontSize: '1.05rem', fontWeight: 600 }}>
+            {game.game}
+          </h3>
+          <p style={{ margin: '0 0 8px 0', color: game.color, fontSize: '0.85rem', fontWeight: 500 }}>
+            {game.subText} • {game.protocol}
+          </p>
+          <p style={{ margin: 0, color: colors.textMuted, fontSize: '0.8rem', lineHeight: 1.4 }}>
+            {game.note}
+          </p>
+        </div>
+      </div>
     );
   };
 
@@ -455,21 +540,25 @@ export default function MonitoringDashboard() {
               </button>
             ) : (
               <>
-                <button onClick={handleEndInteraction} style={{
+                <button onClick={() => {
+                  localStorage.setItem('everloved-session-active', 'false');
+                  setSessionActive(false);
+                  setSessionDuration(0);
+                }} style={{
                   background: colors.danger, color: '#fff', border: 'none',
                   padding: '16px 32px', borderRadius: '12px', fontSize: '1.1rem',
                   fontWeight: 600, cursor: 'pointer',
                 }}>
-                  ⏹️ End Session
+                  ⏹️ End Interaction
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{
                     width: '12px', height: '12px', borderRadius: '50%',
                     background: colors.success, animation: 'pulse 2s infinite',
                   }} />
-                  <span style={{ color: colors.success, fontWeight: 600 }}>Active</span>
+                  <span style={{ color: colors.success, fontWeight: 600 }}>Session Active</span>
                 </div>
-                <button onClick={() => router.push('/patient?start=true')} style={{
+                <button onClick={() => router.push('/patient')} style={{
                   background: colors.accent, color: '#fff', border: 'none',
                   padding: '12px 24px', borderRadius: '10px', fontSize: '1rem',
                   fontWeight: 500, cursor: 'pointer',
@@ -503,14 +592,17 @@ export default function MonitoringDashboard() {
                   alignItems: entry.speaker === 'patient' ? 'flex-end' : 'flex-start',
                 }}>
                   <div style={{
-                    background: entry.speaker === 'patient' ? colors.patientBubble 
-                      : entry.speaker === 'system' ? colors.systemBubble : colors.companionBubble,
-                    padding: '12px 16px', borderRadius: '16px', maxWidth: '80%',
+                    maxWidth: '85%', padding: '12px 16px', borderRadius: '16px',
+                    background: entry.speaker === 'patient' ? colors.patientBubble :
+                               entry.speaker === 'system' ? colors.systemBubble : colors.companionBubble,
                   }}>
-                    <p style={{ margin: 0, color: colors.text, fontSize: '0.95rem' }}>{entry.text}</p>
+                    <p style={{ margin: 0, color: colors.text, fontSize: '0.95rem' }}>
+                      {entry.text}
+                    </p>
                   </div>
-                  <span style={{ fontSize: '0.75rem', color: colors.textMuted, marginTop: '4px', padding: '0 8px' }}>
-                    {entry.speaker === 'patient' ? patientName : entry.speaker === 'system' ? 'System' : 'Companion'} • {formatTime(entry.timestamp)}
+                  <span style={{ fontSize: '0.75rem', color: colors.textMuted, marginTop: '4px' }}>
+                    {entry.speaker === 'patient' ? patientName :
+                     entry.speaker === 'system' ? '⚙️ System' : '🐕 Companion'}
                   </span>
                 </div>
               ))
@@ -519,39 +611,27 @@ export default function MonitoringDashboard() {
           </div>
         </div>
 
+        {/* Therapeutic Interventions Grid */}
         <div style={{
           background: colors.card, borderRadius: '20px', padding: '32px',
           marginBottom: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
             <h2 style={{ color: colors.text, fontSize: '1.2rem', margin: 0 }}>
-              Clinical Intervention Palette
+              🎮 Therapeutic Interventions
             </h2>
             {activeGame && (
               <div style={{
-                background: `linear-gradient(135deg, ${colors.success}20, ${colors.success}10)`,
-                border: `2px solid ${colors.success}`,
-                borderRadius: '12px',
-                padding: '8px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
+                display: 'flex', alignItems: 'center', gap: '10px',
+                background: colors.success + '20',
+                padding: '8px 16px', borderRadius: '12px',
               }}>
-                <div style={{
-                  width: '10px',
-                  height: '10px',
-                  borderRadius: '50%',
-                  background: colors.success,
-                  animation: 'pulse 2s infinite',
+                <span style={{
+                  width: '10px', height: '10px', borderRadius: '50%',
+                  background: colors.success, animation: 'pulse 1.5s infinite',
                 }} />
-                <span style={{ 
-                  color: '#000000', 
-                  fontWeight: 800, 
-                  fontSize: '1.3rem', 
-                  fontFamily: '"Arial Black", "Helvetica Bold", sans-serif',
-                  letterSpacing: '1px',
-                }}>
-                  {formatDuration(gameTimer)}
+                <span style={{ color: colors.success, fontWeight: 600, fontSize: '0.9rem' }}>
+                  {getGameName(activeGame)} • {formatDuration(gameTimer)}
                 </span>
               </div>
             )}
@@ -560,26 +640,63 @@ export default function MonitoringDashboard() {
             Select a therapeutic game matched to {patientName}&apos;s current cognitive stage
           </p>
 
+          {/* 3-Column Grid: Stage 1 | Stage 2 | Stage 3 */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '20px',
             alignItems: 'start',
           }}>
+            {/* Column 1: Stage 1 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {interventions.filter(i => i.stageNum === 1).map(renderGameCard)}
+              <div style={{
+                background: '#DAA52020', padding: '8px 12px', borderRadius: '8px',
+                borderLeft: '3px solid #DAA520', marginBottom: '8px',
+              }}>
+                <h3 style={{ margin: 0, color: '#DAA520', fontSize: '0.85rem', fontWeight: 600 }}>
+                  STAGE 1: Ambient
+                </h3>
+              </div>
+              {stage1Games.map(renderGameCard)}
             </div>
+
+            {/* Column 2: Stage 2 Cognitive Challenge */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {interventions.filter(i => i.stageNum === 2).map(renderGameCard)}
+              <div style={{
+                background: colors.challengeBlue + '20', padding: '8px 12px', borderRadius: '8px',
+                borderLeft: '3px solid ' + colors.challengeBlue, marginBottom: '8px',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <h3 style={{ margin: 0, color: colors.challengeBlue, fontSize: '0.85rem', fontWeight: 600 }}>
+                  STAGE 2: Cognitive
+                </h3>
+                <span style={{
+                  background: colors.challengeBlue, color: '#fff',
+                  padding: '2px 6px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 600,
+                }}>
+                  PREVIEW
+                </span>
+              </div>
+              {stage2Games.map(renderStage2MockupCard)}
             </div>
+
+            {/* Column 3: Stage 3 Sensory */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {interventions.filter(i => i.stageNum === 3).map(renderGameCard)}
+              <div style={{
+                background: '#4682B420', padding: '8px 12px', borderRadius: '8px',
+                borderLeft: '3px solid #4682B4', marginBottom: '8px',
+              }}>
+                <h3 style={{ margin: 0, color: '#4682B4', fontSize: '0.85rem', fontWeight: 600 }}>
+                  STAGE 3: Sensory
+                </h3>
+              </div>
+              {stage3Games.map(renderGameCard)}
             </div>
           </div>
 
+          {/* Game Play Log */}
           <div style={{
-            marginTop: '24px',
-            paddingTop: '20px',
+            marginTop: '24px', paddingTop: '20px',
             borderTop: `1px solid ${colors.textMuted}20`,
           }}>
             <h3 style={{ color: colors.text, fontSize: '1rem', marginBottom: '12px', fontWeight: 600 }}>
@@ -591,25 +708,16 @@ export default function MonitoringDashboard() {
               </p>
             ) : (
               <div style={{
-                maxHeight: '200px',
-                overflowY: 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
+                maxHeight: '200px', overflowY: 'auto',
+                display: 'flex', flexDirection: 'column', gap: '8px',
               }}>
                 {[...gameLog].reverse().map((entry, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      background: `linear-gradient(135deg, ${colors.accent}10, ${colors.accent}05)`,
-                      padding: '10px 14px',
-                      borderRadius: '10px',
-                      border: `1px solid ${colors.accent}20`,
-                    }}
-                  >
+                  <div key={i} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    background: `linear-gradient(135deg, ${colors.accent}10, ${colors.accent}05)`,
+                    padding: '10px 14px', borderRadius: '10px',
+                    border: `1px solid ${colors.accent}20`,
+                  }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ fontSize: '1.1rem' }}>🎮</span>
                       <div>
@@ -618,22 +726,15 @@ export default function MonitoringDashboard() {
                         </p>
                         <p style={{ margin: 0, color: colors.textMuted, fontSize: '0.75rem' }}>
                           {new Date(entry.timestamp).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
+                            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
                           })}
                         </p>
                       </div>
                     </div>
                     <div style={{
                       background: entry.duration >= 180 ? colors.success : entry.duration >= 60 ? colors.accent : colors.textMuted,
-                      color: '#fff',
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      fontWeight: 600,
-                      fontSize: '0.85rem',
-                      fontFamily: 'monospace',
+                      color: '#fff', padding: '4px 10px', borderRadius: '8px',
+                      fontWeight: 600, fontSize: '0.85rem', fontFamily: 'monospace',
                     }}>
                       {formatDuration(entry.duration)}
                     </div>
@@ -643,14 +744,10 @@ export default function MonitoringDashboard() {
             )}
             {gameLog.length > 0 && (
               <div style={{
-                marginTop: '12px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 padding: '10px 14px',
                 background: `linear-gradient(135deg, ${colors.success}15, ${colors.success}05)`,
-                borderRadius: '10px',
-                border: `1px solid ${colors.success}30`,
+                borderRadius: '10px', border: `1px solid ${colors.success}30`,
               }}>
                 <span style={{ color: colors.text, fontSize: '0.85rem', fontWeight: 500 }}>
                   Total Sessions: {gameLog.length}

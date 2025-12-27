@@ -1,5 +1,16 @@
 {
   "pages": {
+    "/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/page.js"
+    ],
+    "/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/css-src_app_globals_css.css",
+      "static/chunks/app/layout.js"
+    ],
     "/caregiver/monitoring/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -10,31 +21,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/caregiver/layout.js"
     ],
-    "/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/css-src_app_globals_css.css",
-      "static/chunks/app/layout.js"
-    ],
     "/patient/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/patient/page.js"
-    ],
-    "/caregiver/analytics/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/caregiver/analytics/page.js"
-    ],
-    "/caregiver/settings/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/caregiver/settings/page.js"
-    ],
-    "/caregiver/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/caregiver/page.js"
     ]
   }
 }
