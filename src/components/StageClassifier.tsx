@@ -76,15 +76,6 @@ export default function StageClassifier() {
     }
   }, []);
 
-  // Save stage to localStorage when confirmed
-  useEffect(() => {
-    try {
-      localStorage.setItem('everloved-disease-stage', savedStage);
-    } catch (e) {
-      console.log('Error saving disease stage to localStorage:', e);
-    }
-  }, [savedStage]);
-
   const stage = STAGES[selectedStage];
   const hasChanges = selectedStage !== savedStage;
 
@@ -103,6 +94,12 @@ export default function StageClassifier() {
     setConfirming(true);
     await new Promise(resolve => setTimeout(resolve, 800));
     setSavedStage(selectedStage);
+    // Save to localStorage
+    try {
+      localStorage.setItem('everloved-disease-stage', selectedStage);
+    } catch (e) {
+      console.log('Error saving disease stage:', e);
+    }
     setConfirming(false);
     setConfirmed(true);
     setTimeout(() => setConfirmed(false), 2000);
