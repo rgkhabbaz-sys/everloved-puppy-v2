@@ -375,8 +375,8 @@ export default function SnowballRevealGame() {
       if (phaseRef.current === GamePhase.WIPE) {
         wipeTimerRef.current = elapsed;
         
-        // 72 seconds before next wave
-        if (elapsed > 72000) {
+        // 82 seconds before next wave
+        if (elapsed > 82000) {
           phaseRef.current = GamePhase.ASSAULT;
           phaseStartTimeRef.current = now;
           setPhase(GamePhase.ASSAULT);
@@ -589,7 +589,7 @@ export default function SnowballRevealGame() {
           zIndex: 100,
           textShadow: '0 1px 3px rgba(0,0,0,0.5)',
         }}>
-          Next snow in: {Math.max(0, 72 - Math.floor(wipeTimerRef.current / 1000))}s
+          Next snow in: {Math.max(0, 82 - Math.floor(wipeTimerRef.current / 1000))}s
         </div>
       )}
     </div>
