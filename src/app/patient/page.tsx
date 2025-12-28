@@ -217,6 +217,8 @@ export default function PatientComfort() {
   const frostyBgImageRef = useRef<HTMLImageElement | null>(null);
   const frostySnowImageRef = useRef<HTMLImageElement | null>(null);
   const frostyAnimationRef = useRef<number>(0);
+  const frostyInitialSnowPixelsRef = useRef<number>(0);
+  const frosty95ThresholdTimeRef = useRef<number | null>(null);
   const [frostyPhase, setFrostyPhase] = useState<'preview' | 'assault' | 'wipe'>('preview');
 
   // ============================================
@@ -598,12 +600,45 @@ export default function PatientComfort() {
           setFrostyPhase('wipe');
           frostyPhaseStartRef.current = now;
           frostyWipeTimerRef.current = 0;
+          frosty95ThresholdTimeRef.current = null;
+          // Count initial snow pixels
+          const imageData = snowCtx.getImageData(0, 0, snowCanvas.width, snowCanvas.height);
+          let count = 0;
+          for (let i = 3; i < imageData.data.length; i += 4) {
+            if (imageData.data[i] > 0) count++;
+          }
+          frostyInitialSnowPixelsRef.current = count;
         }
       }
 
       if (frostyPhaseRef.current === 'wipe') {
         frostyWipeTimerRef.current = elapsed;
-        if (elapsed > 38000) {
+
+        // Check snow coverage every ~500ms to avoid performance issues
+        if (Math.floor(elapsed / 500) !== Math.floor((elapsed - 16) / 500)) {
+          const imageData = snowCtx.getImageData(0, 0, snowCanvas.width, snowCanvas.height);
+          let remaining = 0;
+          for (let i = 3; i < imageData.data.length; i += 4) {
+            if (imageData.data[i] > 0) remaining++;
+          }
+          const percentWiped = frostyInitialSnowPixelsRef.current > 0
+            ? 1 - (remaining / frostyInitialSnowPixelsRef.current)
+            : 0;
+
+          // If 95% wiped and threshold not yet set, record the time
+          if (percentWiped >= 0.95 && frosty95ThresholdTimeRef.current === null) {
+            frosty95ThresholdTimeRef.current = now;
+          }
+        }
+
+        // Transition conditions:
+        // 1. 4 seconds after 95% wiped, OR
+        // 2. 60 seconds max
+        const thresholdMet = frosty95ThresholdTimeRef.current !== null &&
+          (now - frosty95ThresholdTimeRef.current) >= 4000;
+        const maxTimeReached = elapsed > 60000;
+
+        if (thresholdMet || maxTimeReached) {
           frostyPhaseRef.current = 'assault';
           setFrostyPhase('assault');
           frostyPhaseStartRef.current = now;
@@ -2038,7 +2073,9 @@ export default function PatientComfort() {
             color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', zIndex: 100,
             textShadow: '0 1px 3px rgba(0,0,0,0.5)',
           }}>
-            Next snow in: {Math.max(0, 38 - Math.floor(frostyWipeTimerRef.current / 1000))}s
+            {frosty95ThresholdTimeRef.current !== null
+              ? `Next snow in: ${Math.max(0, 4 - Math.floor((performance.now() - frosty95ThresholdTimeRef.current) / 1000))}s`
+              : `Max time: ${Math.max(0, 60 - Math.floor(frostyWipeTimerRef.current / 1000))}s`}
           </div>
         )}
       </div>
