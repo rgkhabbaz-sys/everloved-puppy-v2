@@ -603,7 +603,7 @@ export default function PatientComfort() {
 
       if (frostyPhaseRef.current === 'wipe') {
         frostyWipeTimerRef.current = elapsed;
-        if (elapsed > 42000) {
+        if (elapsed > 38000) {
           frostyPhaseRef.current = 'assault';
           setFrostyPhase('assault');
           frostyPhaseStartRef.current = now;
@@ -2038,7 +2038,7 @@ export default function PatientComfort() {
             color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', zIndex: 100,
             textShadow: '0 1px 3px rgba(0,0,0,0.5)',
           }}>
-            Next snow in: {Math.max(0, 42 - Math.floor(frostyWipeTimerRef.current / 1000))}s
+            Next snow in: {Math.max(0, 38 - Math.floor(frostyWipeTimerRef.current / 1000))}s
           </div>
         )}
       </div>
