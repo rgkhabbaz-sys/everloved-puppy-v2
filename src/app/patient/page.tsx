@@ -1752,11 +1752,12 @@ export default function PatientComfort() {
 
     ws.onopen = () => {
       setIsConnected(true);
-      // FIX: Send start_session immediately with patient context (removed conditional check)
+      // Send start_session with patient context including disease stage
       const patientName = localStorage.getItem('everloved-patient-name') || '';
       const caregiverName = localStorage.getItem('everloved-caregiver-name') || '';
       const lifeStory = localStorage.getItem('everloved-life-story') || '';
-      ws.send(JSON.stringify({ type: 'start_session', patientName, caregiverName, lifeStory }));
+      const diseaseStage = localStorage.getItem('everloved-disease-stage') || 'middle';
+      ws.send(JSON.stringify({ type: 'start_session', patientName, caregiverName, lifeStory, diseaseStage }));
     };
 
     ws.onmessage = async (event) => {
